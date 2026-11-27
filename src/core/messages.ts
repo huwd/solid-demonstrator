@@ -6,6 +6,7 @@
  * developer who is new to Solid, in plain British English.
  */
 
+import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
@@ -351,6 +352,57 @@ export function describeRegistrationProblem(problem: RegistrationProblem, issuer
         summary: `${issuer} didn't give the app a client_id`,
         detail:
           "It said the registration worked, but without a client_id the app has nothing to log in with.",
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** Why a container in the Pod couldn't be listed. */
+export function describeContainerProblem(problem: ContainerProblem, url: URL): Message {
+  switch (problem.kind) {
+    case "request-failed":
+      return { summary: `${url.href} couldn't be fetched`, detail: problem.diagnosis.summary };
+    case "unauthenticated":
+      return {
+        summary: "The Pod didn't accept the login",
+        detail:
+          "It answered 401, which means it doesn't know who's asking: the token may have expired, or the Pod may not trust the identity provider that issued it. Logging in again gets a new token.",
+      };
+    case "forbidden":
+      return {
+        summary: "You aren't allowed to read this",
+        detail:
+          "The Pod answered 403. It knows who you are, but its access rules don't let you read this container. Logging in proved who you are; what you may do is up to the Pod's owner.",
+      };
+    case "not-found":
+      return {
+        summary: "There's nothing at this address",
+        detail: `The Pod answered 404 for ${url.href}.`,
+      };
+    case "http-error":
+      return {
+        summary: "The Pod returned an error",
+        detail: `It answered ${problem.status} for ${url.href}.`,
+      };
+    case "not-turtle":
+      return {
+        summary: "The Pod didn't send a listing the app can read",
+        detail: `It sent ${problem.contentType === null ? "no content type" : problem.contentType}, but the app asked for Turtle, which every Solid Pod must offer for a container.`,
+      };
+    case "unparseable":
+      return {
+        summary: "The listing couldn't be read",
+        detail: `It isn't valid Turtle: ${problem.message}`,
+      };
+    case "not-a-container":
+      return {
+        summary: "This isn't a container",
+        detail: `${url.href} doesn't describe itself as an LDP container, so it has nothing to list.`,
       };
     // Unreachable while the switch covers every problem.
     /* node:coverage ignore next 4 */
