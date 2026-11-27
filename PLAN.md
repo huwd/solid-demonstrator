@@ -106,7 +106,7 @@ Each is pinned exactly.
 
 | Need | Choice |
 | --- | --- |
-| OAuth, PKCE and DPoP | `oauth4webapi` expected ([0002](docs/decisions/0002-build-the-solid-flow-by-hand.md)), to confirm in milestone 2 |
+| OAuth, PKCE and DPoP | `oauth4webapi`, through the traced `fetch` ([0014](docs/decisions/0014-oauth4webapi-for-oauth-steps.md)) |
 | Verifying the access token's signature | `jose`, to confirm in milestone 3 |
 | Parsing Turtle | `n3`, asking for Turtle only ([0011](docs/decisions/0011-parse-turtle-with-n3.md)) |
 | Building the static app | Vite ([0010](docs/decisions/0010-lit-and-vite.md)) |
@@ -207,7 +207,7 @@ Outcome 11's export, and outcome 13.
 
 Still to record:
 
-- the low-level OAuth library, in milestone 2, when login arrives
+- whether `oauth4webapi` or `jose` verifies the access token's signature, in milestone 3
 
 ## Risks
 
