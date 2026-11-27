@@ -1,6 +1,6 @@
 # solid-demonstrator
 
-A static, browser-only Solid app that explains each exchange as it happens: from a WebID to its identity provider and Pod, through login, to reading, writing and notifications. [`README.md`](README.md) gives the overview, [`OUTCOMES.md`](OUTCOMES.md) what it must do, and [`PLAN.md`](PLAN.md) how it gets there. Milestone 1, discovery, is in progress. `src/core` holds the trace, redaction and the traced `fetch`, and the discovery steps: `readWebId`, the profile, each identity provider, the `discover` flow that runs them, and the messages that explain what they find. The app is still a Lit shell.
+A static, browser-only Solid app that explains each exchange as it happens: from a WebID to its identity provider and Pod, through login, to reading, writing and notifications. [`README.md`](README.md) gives the overview, [`OUTCOMES.md`](OUTCOMES.md) what it must do, and [`PLAN.md`](PLAN.md) how it gets there. Milestone 1, discovery, is complete, and milestone 2, login, is in progress. `src/core` holds the trace, redaction and the traced `fetch`, and the discovery steps (`readWebId`, the profile, each identity provider and the `discover` flow), the login steps so far, and the messages that explain what they find. `src/app` holds the Lit views.
 
 ## Commands
 
