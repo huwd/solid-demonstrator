@@ -147,6 +147,7 @@ function renderEntry(entry: TraceEntry): TemplateResult {
         ${entry.explanation === undefined ? nothing : html`<p class=${explained ? "explained" : ""}>${entry.explanation}</p>`}
         ${explained || entry.request === undefined ? nothing : renderRequest(entry.request)}
         ${explained || entry.response === undefined ? nothing : renderResponse(entry.response)}
+        ${explained || entry.message === undefined ? nothing : html`<h4>Message</h4>${renderBody(entry.message)}`}
         ${
           entry.specification === undefined
             ? nothing

@@ -16,11 +16,13 @@ import {
   describeRegistrationProblem,
   describeReturnProblem,
   describeStorageDescriptionProblem,
+  describeSubscribeProblem,
   describeWebIdCheckProblem,
   describeWebIdProblem,
   describeWriteProblem,
   type Message,
 } from "./messages.ts";
+import type { SubscribeProblem } from "./notifications.ts";
 import type { TurtleProblem } from "./pod-read.ts";
 import type { PodTrustProblem } from "./pod-trust-check.ts";
 import type { WriteProblem } from "./pod-write.ts";
@@ -399,6 +401,28 @@ describe("describeWriteProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeWriteProblem(problem, url);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeSubscribeProblem", () => {
+  const service = new URL("https://pod.example/.notifications/WebSocketChannel2023/");
+  const cases: [SubscribeProblem, RegExp, RegExp][] = [
+    [{ kind: "forbidden" }, /won't let you watch/, /only to what they may read/],
+    [{ kind: "not-json" }, /didn't answer with a channel/, /isn't JSON/],
+    [
+      { kind: "not-a-channel", missing: "receiveFrom" },
+      /didn't say where to listen/,
+      /receiveFrom/,
+    ],
+    [{ kind: "http-error", status: 500 }, /returned an error/, /500/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeSubscribeProblem(problem, service);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

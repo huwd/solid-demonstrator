@@ -10,6 +10,7 @@ import type { AccessRulesProblem } from "./access-rules.ts";
 import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
+import type { SubscribeProblem } from "./notifications.ts";
 import type { ReadProblem, TurtleProblem } from "./pod-read.ts";
 import type { BeyondSolidRule, PodTrustProblem } from "./pod-trust-check.ts";
 import type { WriteProblem } from "./pod-write.ts";
@@ -553,5 +554,28 @@ export function describeWriteProblem(problem: WriteProblem, url: URL): Message {
       };
     default:
       return describeReadProblem(problem, url);
+  }
+}
+
+/** Why the app couldn't subscribe to notifications. */
+export function describeSubscribeProblem(problem: SubscribeProblem, service: URL): Message {
+  switch (problem.kind) {
+    case "forbidden":
+      return {
+        summary: "The notification service won't let you watch this",
+        detail: "It answered 403. A service lets someone subscribe only to what they may read.",
+      };
+    case "not-json":
+      return {
+        summary: "The notification service didn't answer with a channel",
+        detail: `${service.href} sent something that isn't JSON.`,
+      };
+    case "not-a-channel":
+      return {
+        summary: "The notification service didn't say where to listen",
+        detail: `Its answer has no WebSocket address in ${problem.missing}, so the app can't receive notifications.`,
+      };
+    default:
+      return describeReadProblem(problem, service);
   }
 }
