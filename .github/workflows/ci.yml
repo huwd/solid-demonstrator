@@ -1,0 +1,73 @@
+# One job per check, so each can become a required status check.
+# Job `name:` values are what rulesets require: keep them stable.
+#
+# No `on: paths:` filters: a required check that never runs blocks the PR.
+#
+# Each job runs the same pnpm script contributors run locally.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs:
+    name: Docs lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      # pnpm/action-setup reads the version from package.json `packageManager`.
+      - uses: pnpm/action-setup@v6.1.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run docs:lint
+
+  # Vale comes from devenv, bundled with the house styles and the en_GB
+  # dictionary (nix/vale.nix), so CI checks prose exactly as `devenv test`
+  # does locally. Nix reads devenv's binary cache directly, rather than
+  # through cachix/cachix-action, whose tags are major-only and can't be
+  # verified as full version tags.
+  prose:
+    name: Docs prose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v32.1.0
+        with:
+          extra_nix_config: |
+            extra-substituters = https://devenv.cachix.org
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+      - run: nix profile install nixpkgs#devenv
+      - run: devenv shell -- pnpm run docs:prose
+
+  # zizmor audits the workflows for security problems. Configuration and its
+  # reasons are in zizmor.yml. Results are printed in the log rather than
+  # uploaded to code scanning, so the job stays read-only.
+  workflows:
+    name: Workflow audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@v0.9.2
+        with:
+          advanced-security: false
+          # Keep in step with pkgs.zizmor in devenv.nix.
+          version: 1.32.0

@@ -11,7 +11,8 @@
   "scripts": {
     "check": "pnpm run docs:lint && pnpm run docs:prose",
     "docs:lint": "markdownlint-cli2",
-    "docs:prose": "git ls-files -z --cached --others --exclude-standard '*.md' | xargs --null vale"
+    "docs:prose": "git ls-files -z --cached --others --exclude-standard '*.md' | xargs --null vale",
+    "workflows:audit": "zizmor --offline ."
   },
   "devDependencies": {
     "markdownlint-cli2": "0.24.2"
