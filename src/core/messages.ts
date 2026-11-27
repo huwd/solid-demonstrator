@@ -10,6 +10,7 @@ import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
+import type { WebIdCheckProblem } from "./token-webid-check.ts";
 import type { WebIdProblem } from "./webid.ts";
 
 export interface Message {
@@ -277,6 +278,47 @@ export function describeExchangeProblem(problem: ExchangeProblem, issuer: string
       return {
         summary: "The tokens didn't pass oauth4webapi's checks",
         detail: problem.message,
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** Why a Pod would refuse the token, because its WebID doesn't vouch for its issuer. */
+export function describeWebIdCheckProblem(
+  problem: WebIdCheckProblem,
+  issuer: string,
+  webId: string | null,
+): Message {
+  const consequence = "A Pod would refuse this token, so reading and writing won't work.";
+  switch (problem.kind) {
+    case "no-webid":
+      return {
+        summary: "The token names no WebID",
+        detail: `${issuer} didn't say which WebID you logged in as. ${consequence}`,
+      };
+    case "bad-webid":
+      return {
+        summary: "The token's WebID can't be checked",
+        detail: `${webId} isn't a WebID the app can fetch: ${describeWebIdProblem(problem.problem).summary}. ${consequence}`,
+      };
+    case "profile":
+      return {
+        summary: "The token's WebID profile couldn't be read",
+        detail: `${describeProfileProblem(problem.problem, problem.document).summary}. ${consequence}`,
+      };
+    case "issuer-not-named":
+      return {
+        summary: `The profile doesn't name ${issuer}`,
+        detail: `${
+          problem.named.length === 0
+            ? "The profile names no identity provider."
+            : `The profile names ${problem.named.join(", ")}, but the token is from ${issuer}.`
+        } ${consequence}`,
       };
     // Unreachable while the switch covers every problem.
     /* node:coverage ignore next 4 */

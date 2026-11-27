@@ -106,6 +106,7 @@ describe("exchangeCode", () => {
     assert.ok(result.ok);
     assert.equal(result.session.webId, webId);
     assert.equal(result.session.issuer, issuer);
+    assert.equal(result.session.idTokenClaims["nonce"], pending.nonce);
     assert.ok(result.session.expiresAt instanceof Date);
 
     const [request] = exchange.requests;

@@ -34,6 +34,8 @@ export interface Session {
   /** The WebID the identity provider says the person logged in as. */
   readonly webId: string | null;
   readonly accessToken: string;
+  /** The ID token's claims, as oauth4webapi validated them. */
+  readonly idTokenClaims: Readonly<Record<string, unknown>>;
   /** When the access token expires, if the provider said. */
   readonly expiresAt: Date | null;
   readonly dpopKeyPair: CryptoKeyPair;
@@ -166,6 +168,7 @@ export async function exchangeCode(
         issuer: pending.issuer,
         webId,
         accessToken: result.access_token,
+        idTokenClaims: { ...claims },
         expiresAt:
           typeof result.expires_in === "number"
             ? new Date(Date.now() + result.expires_in * 1000)

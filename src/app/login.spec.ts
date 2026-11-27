@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
 import { signTestJwt } from "../core/test-support/tokens.ts";
 
@@ -22,6 +23,17 @@ interface Options {
   /** Replaces the token response's fields. */
   readonly tokens?: Record<string, unknown>;
   readonly tokenStatus?: number;
+  /** The profile from the second fetch on, when the app checks the token's WebID. */
+  readonly profileAfterLogin?: string;
+}
+
+const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> .`;
+
+/** The RFC 7638 thumbprint of the key in a DPoP proof, as a provider binds a token to it. */
+function proofThumbprint(proof: string): string {
+  const header = JSON.parse(Buffer.from(proof.split(".")[0] ?? "", "base64url").toString());
+  const { crv, kty, x, y } = header.jwk;
+  return createHash("sha256").update(JSON.stringify({ crv, kty, x, y })).digest("base64url");
 }
 
 const answerWithCode = (request: URL) =>
@@ -35,12 +47,14 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
   const answer = options.answer ?? answerWithCode;
   let authorization: URL | null = null;
   const tokenRequests: Request[] = [];
-  await page.route(alice, (route) =>
-    route.fulfill({
+  let profileFetches = 0;
+  await page.route(alice, (route) => {
+    profileFetches += 1;
+    return route.fulfill({
       headers: { ...cors, "content-type": "text/turtle" },
-      body: `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> .`,
-    }),
-  );
+      body: profileFetches > 1 ? (options.profileAfterLogin ?? profile) : profile,
+    });
+  });
   await page.route(`${issuer}/.well-known/openid-configuration`, (route) =>
     route.fulfill({
       headers: cors,
@@ -79,7 +93,13 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
     const now = Math.floor(Date.now() / 1000);
     const sent = authorization?.searchParams;
     const body = {
-      access_token: await signTestJwt({ webid: webId, exp: now + 300 }),
+      access_token: await signTestJwt({
+        webid: webId,
+        aud: "solid",
+        client_id: sent?.get("client_id"),
+        exp: now + 300,
+        cnf: { jkt: proofThumbprint(route.request().headers()["dpop"] ?? "") },
+      }),
       id_token: await signTestJwt({
         aud: sent?.get("client_id"),
         sub: webId,
@@ -140,8 +160,9 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
-  // back, then the exchange.
-  await expect(timeline.getByRole("listitem")).toHaveCount(6);
+  // back, the exchange, then the profile again and the Pod's check.
+  await expect(timeline.getByRole("listitem")).toHaveCount(8);
+  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(1);
   await expect(timeline).not.toContainText("one-time-code-0123456789");
 
   const [exchange] = provider.tokenRequests;
@@ -227,4 +248,46 @@ test("explains a provider that would need the app to register first", async ({ p
   await discoverAlice(page);
   await expect(page.getByText(/doesn't read Client ID Documents/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Log in/ })).toHaveCount(0);
+});
+
+test("shows what the tokens say, and repeats the Pod's check of the WebID", async ({
+  page,
+  baseURL,
+}) => {
+  await serveAlice(page);
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+
+  const inspector = page.locator("token-inspector");
+  await expect(inspector.getByText("The access token is bound to the app's key")).toBeVisible();
+  await expect(inspector.getByText(`The WebID's profile names ${issuer}`)).toBeVisible();
+  await expect(inspector.getByRole("heading", { name: "Access token" })).toBeVisible();
+  await expect(inspector.getByRole("heading", { name: "ID token" })).toBeVisible();
+  await expect(inspector.getByText(`${baseURL}/clientid.jsonld`).first()).toBeVisible();
+  await expect(inspector.getByText(webId).first()).toBeVisible();
+  await expect(inspector).not.toContainText("eyJ");
+});
+
+test("warns when the WebID's profile doesn't name the provider", async ({ page }) => {
+  await serveAlice(page, {
+    profileAfterLogin: `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <https://other.example> .`,
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const alert = page.locator("token-inspector").getByRole("alert");
+  await expect(alert).toContainText(`The profile doesn't name ${issuer}`);
+  await expect(alert).toContainText("A Pod would refuse this token");
+});
+
+test("warns when the access token is bound to another key", async ({ page }) => {
+  await serveAlice(page, {
+    tokens: {
+      access_token: await signTestJwt({ webid: webId, cnf: { jkt: "someone-elses-key" } }),
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.locator("token-inspector").getByRole("alert")).toContainText(
+    "bound to a different key",
+  );
 });
