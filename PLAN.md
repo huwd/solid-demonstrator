@@ -113,7 +113,7 @@ Each is pinned exactly.
 | Need | Choice |
 | --- | --- |
 | OAuth, PKCE and DPoP | `oauth4webapi`, through the traced `fetch` ([0014](docs/decisions/0014-oauth4webapi-for-oauth-steps.md)) |
-| Verifying the access token's signature | `jose`, to confirm in milestone 3 |
+| Repeating the Pod's checks of the token and DPoP proof | `oauth4webapi`'s `validateJwtAccessToken` ([decision 0016](docs/decisions/0016-oauth4webapi-for-the-pods-checks.md)) |
 | Parsing Turtle | `n3`, asking for Turtle only ([0011](docs/decisions/0011-parse-turtle-with-n3.md)) |
 | Building the static app | Vite ([0010](docs/decisions/0010-lit-and-vite.md)) |
 | Interface | Lit, without decorators ([0010](docs/decisions/0010-lit-and-vite.md)) |
@@ -220,7 +220,6 @@ Outcome 11's export, and outcome 13.
 
 Still to record:
 
-- whether `oauth4webapi` or `jose` verifies the access token's signature, in milestone 3
 - how the pictures are drawn, in milestone 6
 
 ## Risks
