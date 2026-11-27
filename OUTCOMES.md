@@ -112,7 +112,7 @@ A person can see each kind of refusal and understand where it came from:
 
 - No login: `401`, and what the Pod asked for.
 - Logged in, but not allowed: `403`, and that the decision came from the Pod's access rules, not the identity provider.
-- Where the person has Control access, they can view the access rules for a resource.
+- Where the person has Control access, they can view the access rules for a resource, whether the Pod uses Web Access Control or Access Control Policies.
 
 ### 8. Watch notifications arrive
 
