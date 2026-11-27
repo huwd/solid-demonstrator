@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PendingLogin } from "./login.ts";
 import {
+  forgetLogins,
   forgetRegistration,
   type LoginStorage,
   loginStorageKey,
@@ -99,5 +100,16 @@ describe("registrations", () => {
       rememberRegistration(storage, issuer, site, "client-a");
       assert.equal(recallRegistration(storage, issuer, site), "client-a", text);
     }
+  });
+});
+
+describe("forgetLogins", () => {
+  it("removes the pending login and every registration", () => {
+    const storage = memoryStorage();
+    saveLogin(storage, { pending, entries: [] });
+    rememberRegistration(storage, "https://id.example", "https://app.example/", "client-a");
+    storage.setItem("someone-elses", "kept");
+    forgetLogins(storage);
+    assert.deepEqual([...storage.items.keys()], ["someone-elses"]);
   });
 });
