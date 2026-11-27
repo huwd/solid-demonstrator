@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clientIdDocument, clientIdDocumentPath } from "./client-id.ts";
+import { clientIdDocument, clientIdDocumentPath, clientMetadata } from "./client-id.ts";
 
 describe("clientIdDocument", () => {
   const document = clientIdDocument(new URL("https://example.org/demonstrator/"));
@@ -29,5 +29,14 @@ describe("clientIdDocument", () => {
     const atRoot = clientIdDocument(new URL("https://demo.example/"));
     assert.equal(atRoot.client_id, "https://demo.example/clientid.jsonld");
     assert.deepEqual(atRoot.redirect_uris, ["https://demo.example/"]);
+  });
+});
+
+describe("clientMetadata", () => {
+  it("is the Client ID Document without its context and client_id, for registration", () => {
+    const site = new URL("https://example.org/demonstrator/");
+    const { "@context": _context, client_id: _clientId, ...rest } = clientIdDocument(site);
+    assert.deepEqual(clientMetadata(site), rest);
+    assert.equal("client_id" in clientMetadata(site), false);
   });
 });

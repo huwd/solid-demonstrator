@@ -8,12 +8,14 @@ import {
   describeIssuerProblem,
   describeProfileGaps,
   describeProfileProblem,
+  describeRegistrationProblem,
   describeReturnProblem,
   describeWebIdCheckProblem,
   describeWebIdProblem,
   type Message,
 } from "./messages.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
+import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
 import type { WebIdCheckProblem } from "./token-webid-check.ts";
 import type { WebIdProblem } from "./webid.ts";
@@ -233,6 +235,40 @@ describe("describeWebIdCheckProblem", () => {
   for (const [problem, named, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeWebIdCheckProblem(problem, issuer, named);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeRegistrationProblem", () => {
+  const cases: [RegistrationProblem, RegExp, RegExp][] = [
+    [
+      { kind: "request-failed", diagnosis: { kind: "unreachable", summary: "No answer." } },
+      /registration endpoint couldn't be reached/,
+      /^No answer\.$/,
+    ],
+    [
+      { kind: "refused", status: 400, error: "invalid_redirect_uri", description: "Not allowed" },
+      /wouldn't register the app/,
+      /It answered 400 with invalid_redirect_uri: Not allowed\./,
+    ],
+    [
+      { kind: "refused", status: 400, error: "invalid_client_metadata", description: null },
+      /wouldn't register/,
+      /invalid_client_metadata\.$/,
+    ],
+    [
+      { kind: "refused", status: 403, error: null, description: null },
+      /wouldn't register/,
+      /403, without saying why/,
+    ],
+    [{ kind: "no-client-id" }, /didn't give the app a client_id/, /nothing to log in with/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeRegistrationProblem(problem, issuer);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

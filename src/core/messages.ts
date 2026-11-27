@@ -9,6 +9,7 @@
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
+import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
 import type { WebIdCheckProblem } from "./token-webid-check.ts";
 import type { WebIdProblem } from "./webid.ts";
@@ -319,6 +320,37 @@ export function describeWebIdCheckProblem(
             ? "The profile names no identity provider."
             : `The profile names ${problem.named.join(", ")}, but the token is from ${issuer}.`
         } ${consequence}`,
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** Why the app couldn't register with the identity provider. */
+export function describeRegistrationProblem(problem: RegistrationProblem, issuer: string): Message {
+  switch (problem.kind) {
+    case "request-failed":
+      return {
+        summary: `${issuer}'s registration endpoint couldn't be reached`,
+        detail: problem.diagnosis.summary,
+      };
+    case "refused":
+      return {
+        summary: `${issuer} wouldn't register the app`,
+        detail:
+          problem.error === null
+            ? `It answered ${problem.status}, without saying why.`
+            : `It answered ${problem.status} with ${problem.error}${problem.description === null ? "" : `: ${problem.description}`}.`,
+      };
+    case "no-client-id":
+      return {
+        summary: `${issuer} didn't give the app a client_id`,
+        detail:
+          "It said the registration worked, but without a client_id the app has nothing to log in with.",
       };
     // Unreachable while the switch covers every problem.
     /* node:coverage ignore next 4 */
