@@ -207,7 +207,7 @@ The plumbing view, drawn as pictures rather than only listed. It comes after rea
 
 Every picture has a text equivalent that a screen reader can follow. Animation is used only to show what moved between parties, and is turned off for people who ask for reduced motion.
 
-Sketches of each picture are agreed with the maintainer before they're built. How the pictures are drawn, such as SVG rendered by Lit or a diagram library, is recorded as a decision at the start of the milestone.
+Sketches of each picture are agreed with the maintainer before they're built. The pictures are a map of the parties, a sequence timeline and a detail panel, driven by one cursor ([decision 0018](docs/decisions/0018-show-the-journey-as-a-map-timeline-and-detail.md)), drawn as SVG by Lit components with a layout of the app's own ([decision 0019](docs/decisions/0019-draw-the-pictures-as-svg-in-lit.md)).
 
 ### 7. Sharing and the tour
 
@@ -220,10 +220,6 @@ Outcome 11's export, and outcome 13.
 ## Decisions
 
 [`docs/decisions/`](docs/decisions/README.md) records the decisions this plan rests on. Check a change against the accepted records before making it.
-
-Still to record:
-
-- how the pictures are drawn, in milestone 6
 
 ## Risks
 
