@@ -6,7 +6,9 @@ import { generateDpopKeyPair, loginScope, prepareLogin } from "./login.ts";
 const configuration = {
   issuer: "https://id.example",
   authorizationEndpoint: new URL("https://id.example/auth?tenant=demo"),
+  tokenEndpoint: new URL("https://id.example/token"),
   issParameterSupported: true,
+  idTokenSigningAlgs: ["ES256"],
 };
 const client = {
   clientId: "https://app.example/clientid.jsonld",
@@ -45,6 +47,8 @@ describe("prepareLogin", () => {
     const { pending } = await prepareLogin(configuration, client);
     assert.equal(pending.issuer, "https://id.example");
     assert.equal(pending.issParameterSupported, true);
+    assert.equal(pending.tokenEndpoint, "https://id.example/token");
+    assert.deepEqual(pending.idTokenSigningAlgs, ["ES256"]);
     assert.equal(pending.clientId, client.clientId);
     assert.equal(pending.redirectUri, client.redirectUri);
     for (const secret of [pending.codeVerifier, pending.state, pending.nonce]) {

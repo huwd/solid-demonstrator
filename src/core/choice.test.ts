@@ -18,6 +18,7 @@ function readable(issuer: string): ProviderFinding {
         registrationEndpoint: null,
         clientIdDocuments: true,
         issParameterSupported: true,
+        idTokenSigningAlgs: [],
         gaps: issuer.includes("gaps") ? ["no-pkce-s256"] : [],
       },
     },

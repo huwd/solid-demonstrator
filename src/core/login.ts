@@ -38,6 +38,10 @@ export interface PendingLogin extends LoginClient {
   readonly issParameterSupported: boolean;
   /** The address the person was sent to, recorded when they come back. */
   readonly authorizationUrl: string;
+  /** Where the code is exchanged for tokens. */
+  readonly tokenEndpoint: string;
+  /** How the provider says it signs ID tokens. */
+  readonly idTokenSigningAlgs: readonly string[];
   readonly codeVerifier: string;
   readonly state: string;
   readonly nonce: string;
@@ -55,7 +59,11 @@ export const loginScope = "openid webid";
 export async function prepareLogin(
   configuration: Pick<
     IssuerConfiguration,
-    "issuer" | "authorizationEndpoint" | "issParameterSupported"
+    | "issuer"
+    | "authorizationEndpoint"
+    | "tokenEndpoint"
+    | "issParameterSupported"
+    | "idTokenSigningAlgs"
   >,
   client: LoginClient,
 ): Promise<PreparedLogin> {
@@ -83,6 +91,8 @@ export async function prepareLogin(
       issuer: configuration.issuer,
       issParameterSupported: configuration.issParameterSupported,
       authorizationUrl: authorizationUrl.href,
+      tokenEndpoint: configuration.tokenEndpoint.href,
+      idTokenSigningAlgs: configuration.idTokenSigningAlgs,
       ...client,
       codeVerifier,
       state,

@@ -49,6 +49,7 @@ export function takeLogin(storage: LoginStorage): SavedLogin | null {
 const pendingStrings = [
   "issuer",
   "authorizationUrl",
+  "tokenEndpoint",
   "clientId",
   "redirectUri",
   "codeVerifier",
@@ -67,6 +68,8 @@ function isSavedLogin(value: unknown): value is SavedLogin {
   const fields = pending as Record<string, unknown>;
   return (
     pendingStrings.every((name) => typeof fields[name] === "string") &&
-    typeof fields["issParameterSupported"] === "boolean"
+    typeof fields["issParameterSupported"] === "boolean" &&
+    Array.isArray(fields["idTokenSigningAlgs"]) &&
+    fields["idTokenSigningAlgs"].every((alg) => typeof alg === "string")
   );
 }

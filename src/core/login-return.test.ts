@@ -11,6 +11,8 @@ const pending: PendingLogin = {
   issuer: "https://id.example",
   issParameterSupported: true,
   authorizationUrl: `https://id.example/auth?response_type=code&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&state=${state}&nonce=n-0S6_WzA2Mj-nonce-value-0123456789abcdef`,
+  tokenEndpoint: "https://id.example/token",
+  idTokenSigningAlgs: ["ES256"],
   clientId: "https://app.example/clientid.jsonld",
   redirectUri: "https://app.example/",
   codeVerifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",

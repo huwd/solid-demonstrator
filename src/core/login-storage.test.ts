@@ -21,6 +21,8 @@ const pending: PendingLogin = {
   issuer: "https://id.example",
   issParameterSupported: true,
   authorizationUrl: "https://id.example/auth?state=s",
+  tokenEndpoint: "https://id.example/token",
+  idTokenSigningAlgs: ["ES256"],
   clientId: "https://app.example/clientid.jsonld",
   redirectUri: "https://app.example/",
   codeVerifier: "verifier",
@@ -46,6 +48,8 @@ describe("saveLogin and takeLogin", () => {
       JSON.stringify({ pending, entries: "none" }),
       JSON.stringify({ pending: { ...pending, state: 1 }, entries: [] }),
       JSON.stringify({ pending: { ...pending, issParameterSupported: "yes" }, entries: [] }),
+      JSON.stringify({ pending: { ...pending, idTokenSigningAlgs: "ES256" }, entries: [] }),
+      JSON.stringify({ pending: { ...pending, idTokenSigningAlgs: [256] }, entries: [] }),
     ]) {
       const storage = memoryStorage();
       storage.setItem(loginStorageKey, text);
