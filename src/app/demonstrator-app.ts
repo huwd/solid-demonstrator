@@ -13,11 +13,14 @@ import {
   type Message,
 } from "../core/messages.ts";
 import { exchangeCode, type Session } from "../core/token-exchange.ts";
+import { type Inspection, inspectSession } from "../core/token-inspection.ts";
+import { checkTokenWebId, type WebIdCheckResult } from "../core/token-webid-check.ts";
 import { createTrace, type Trace } from "../core/trace.ts";
 import { createTracedFetch, type TracedFetch } from "../core/traced-fetch.ts";
 import type { ChooseEvent } from "./discovery-results.ts";
 import { loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
 import "./discovery-results.ts";
+import "./token-inspector.ts";
 import "./trace-timeline.ts";
 
 type State =
@@ -33,7 +36,14 @@ type State =
   | { readonly kind: "leaving"; readonly issuer: string }
   | { readonly kind: "exchanging"; readonly issuer: string }
   /** Logged in. The session, and its token, are held only here, in memory (decision 0008). */
-  | { readonly kind: "logged-in"; readonly session: Session }
+  | {
+      readonly kind: "logged-in";
+      readonly session: Session;
+      /** Null until the tokens have been read. */
+      readonly inspection: Inspection | null;
+      /** Null while the Pod's check is being repeated. */
+      readonly webIdCheck: WebIdCheckResult | null;
+    }
   | { readonly kind: "login-failed"; readonly message: Message }
   /** A login response arrived, but this tab started no login. */
   | { readonly kind: "unexpected-return" };
@@ -166,9 +176,27 @@ export class DemonstratorApp extends LitElement {
       await dpopKeyPair(),
       this.#trace,
     );
-    this.state = result.ok
-      ? { kind: "logged-in", session: result.session }
-      : { kind: "login-failed", message: describeExchangeProblem(result.problem, pending.issuer) };
+    if (!result.ok) {
+      this.state = {
+        kind: "login-failed",
+        message: describeExchangeProblem(result.problem, pending.issuer),
+      };
+      return;
+    }
+    const { session } = result;
+    this.state = { kind: "logged-in", session, inspection: null, webIdCheck: null };
+    const inspection = await inspectSession(session);
+    this.state = { kind: "logged-in", session, inspection, webIdCheck: null };
+    // The Pod reads the access token, so the check uses what it says, where it can be read.
+    const webIdCheck = await checkTokenWebId(
+      this.#tracedFetch,
+      {
+        issuer: inspection.accessToken?.issuer ?? session.issuer,
+        webId: inspection.accessToken?.webId ?? session.webId,
+      },
+      this.#trace,
+    );
+    this.state = { kind: "logged-in", session, inspection, webIdCheck };
   }
 
   override render() {
@@ -324,7 +352,13 @@ export class DemonstratorApp extends LitElement {
             }. The token is kept only in this page's memory, so reloading the page means logging in
             again.
           </p>
-        </div>`;
+        </div>
+        <token-inspector
+          .inspection=${state.inspection}
+          .webIdCheck=${state.webIdCheck}
+          .issuer=${state.inspection?.accessToken?.issuer ?? session.issuer}
+          .webId=${state.inspection?.accessToken?.webId ?? session.webId}
+        ></token-inspector>`;
       }
       default:
         return nothing;
