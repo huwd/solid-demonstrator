@@ -17,6 +17,7 @@ function readable(issuer: string): ProviderFinding {
         jwksUri: new URL(`${issuer}/jwks`),
         registrationEndpoint: null,
         clientIdDocuments: true,
+        issParameterSupported: true,
         gaps: issuer.includes("gaps") ? ["no-pkce-s256"] : [],
       },
     },

@@ -34,6 +34,10 @@ export interface LoginClient {
 /** What the app keeps until the person comes back. */
 export interface PendingLogin extends LoginClient {
   readonly issuer: string;
+  /** Whether the response must name the issuer in `iss` (RFC 9207). */
+  readonly issParameterSupported: boolean;
+  /** The address the person was sent to, recorded when they come back. */
+  readonly authorizationUrl: string;
   readonly codeVerifier: string;
   readonly state: string;
   readonly nonce: string;
@@ -49,7 +53,10 @@ export interface PreparedLogin {
 export const loginScope = "openid webid";
 
 export async function prepareLogin(
-  configuration: Pick<IssuerConfiguration, "issuer" | "authorizationEndpoint">,
+  configuration: Pick<
+    IssuerConfiguration,
+    "issuer" | "authorizationEndpoint" | "issParameterSupported"
+  >,
   client: LoginClient,
 ): Promise<PreparedLogin> {
   const codeVerifier = generateRandomCodeVerifier();
@@ -72,7 +79,15 @@ export async function prepareLogin(
 
   return {
     authorizationUrl,
-    pending: { issuer: configuration.issuer, ...client, codeVerifier, state, nonce },
+    pending: {
+      issuer: configuration.issuer,
+      issParameterSupported: configuration.issParameterSupported,
+      authorizationUrl: authorizationUrl.href,
+      ...client,
+      codeVerifier,
+      state,
+      nonce,
+    },
   };
 }
 

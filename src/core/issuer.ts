@@ -19,6 +19,11 @@ export interface IssuerConfiguration {
   readonly registrationEndpoint: URL | null;
   /** Whether the provider accepts a Client ID Document as its `client_id` (decision 0009). */
   readonly clientIdDocuments: boolean;
+  /**
+   * Whether the provider names itself in `iss` when it sends the person
+   * back, so the app can check the response came from it (RFC 9207).
+   */
+  readonly issParameterSupported: boolean;
   /** Features the demonstrator's login needs that the provider doesn't say it offers. */
   readonly gaps: readonly IssuerGap[];
 }
@@ -154,6 +159,7 @@ export async function discoverIssuer(
       jwksUri: jwksUri as URL,
       registrationEndpoint: registrationEndpoint as URL | null,
       clientIdDocuments,
+      issParameterSupported: document["authorization_response_iss_parameter_supported"] === true,
       gaps,
     },
   };
