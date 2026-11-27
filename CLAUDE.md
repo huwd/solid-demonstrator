@@ -9,8 +9,8 @@ Run everything inside `devenv shell`, or prefix a command with `devenv shell --`
 | Command | Does |
 | ------- | ---- |
 | `devenv test` | The build: install from the lockfile, then run `pnpm run check` |
-| `pnpm run check` | Everything CI runs: Biome, TypeScript, tests, the Vite build, markdownlint and Vale |
-| `pnpm run lint` / `typecheck` / `test` / `build` / `docs:lint` / `docs:prose` | One check each |
+| `pnpm run check` | Everything CI runs: Biome, TypeScript, tests, the Vite build, browser tests, markdownlint and Vale |
+| `pnpm run lint` / `typecheck` / `test` / `build` / `test:browser` / `docs:lint` / `docs:prose` | One check each |
 | `pnpm run format` | Biome formatting and safe fixes |
 | `pnpm run dev` | The app, served by Vite with reload |
 | `pnpm run workflows:audit` | zizmor security audit of the workflows, also run in CI |
@@ -32,7 +32,7 @@ The project follows [solid-oidc](https://github.com/huwd/solid-oidc)'s conventio
 - Write documentation, and text the app shows, in plain British English in the GOV.UK style. Vale errors fail the build: fix them, and add genuine project terms to `.vale/styles/config/vocabularies/House/accept.txt`. Judge its warnings.
 - Pin dependencies exactly. pnpm refuses versions published less than 48 hours ago.
 - Follow solid-oidc's [`docs/code-style.md`](https://github.com/huwd/solid-oidc/blob/main/docs/code-style.md) for TypeScript. Write only erasable syntax, since Node strips types to run the tests: Lit components declare properties with static fields, not decorators ([0010](docs/decisions/0010-lit-and-vite.md)).
-- Code that runs in Node as well as the browser lives in `src/core`, and never imports from `src/app` or Lit. Keep `src/core` at 100% line, branch and function coverage with `node:test`. `src/app` is tested in browsers with Playwright ([0012](docs/decisions/0012-playwright-for-browser-tests.md)).
+- Code that runs in Node as well as the browser lives in `src/core`, and never imports from `src/app` or Lit. Keep `src/core` at 100% line, branch and function coverage with `node:test`. `src/app` is tested in Chromium, Firefox and WebKit with Playwright, in `*.spec.ts` files beside the code ([0012](docs/decisions/0012-playwright-for-browser-tests.md)). The browsers come from nixpkgs through devenv, so `@playwright/test` is pinned to `pkgs.playwright-driver.version` and changes only with `devenv update`.
 - Steps make requests only through the traced `fetch`, never `fetch` itself, so every exchange is redacted and recorded.
 - Keep deployment-specific values, such as real domains, out of the code. They belong in configuration, such as the `SITE_URL` build setting.
 

@@ -12,6 +12,8 @@
 # - the gh-actions-lock extension version in verify-pins.yml
 # - the zizmor version in ci.yml, kept in step with nixpkgs in devenv
 # - devenv.lock (`devenv update`)
+# - @playwright/test, which must equal pkgs.playwright-driver.version from
+#   devenv.lock's nixpkgs, so it moves only with `devenv update`
 
 version: 2
 updates:
@@ -32,6 +34,8 @@ updates:
       interval: weekly
     cooldown:
       default-days: 2
+    ignore:
+      - dependency-name: "@playwright/test"
     groups:
       npm-minor-and-patch:
         patterns: ["*"]

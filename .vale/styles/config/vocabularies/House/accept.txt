@@ -15,6 +15,7 @@ Lit('s)?
 (?i)loopback
 maintainer's
 markdownlint
+nixpkgs
 Nygard('s)?
 OAuth
 pnpm
