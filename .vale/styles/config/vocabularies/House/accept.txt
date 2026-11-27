@@ -2,6 +2,7 @@ actionlint
 (?i)backends?
 Biome
 Bitwarden
+Centauri
 (?i)bundlers?
 (?i)changelogs?
 Cloudflare

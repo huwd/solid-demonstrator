@@ -76,3 +76,5 @@ Editorial improvements, such as clearer wording, typo corrections and link fixes
 | [0015](0015-test-against-fictional-and-live-servers.md) | Test against fictional and live servers, without a local stack for now | Accepted |
 | [0016](0016-oauth4webapi-for-the-pods-checks.md) | Use oauth4webapi to repeat the Pod's checks of the token and DPoP proof | Accepted |
 | [0017](0017-write-to-a-scratch-folder-by-default.md) | Write to a scratch folder by default, and show how to narrow the app's access | Accepted |
+| [0018](0018-show-the-journey-as-a-map-timeline-and-detail.md) | Show the journey as a map, a sequence timeline and a detail panel | Accepted |
+| [0019](0019-draw-the-pictures-as-svg-in-lit.md) | Draw the pictures as SVG in Lit components, with a layout of the app's own | Accepted |
