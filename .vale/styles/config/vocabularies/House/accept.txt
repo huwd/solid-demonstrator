@@ -1,6 +1,7 @@
 actionlint
 (?i)backends?
 Biome
+Bitwarden
 (?i)bundlers?
 (?i)changelogs?
 Cloudflare
@@ -11,6 +12,7 @@ jq
 (?i)linters?
 (?i)lockfiles?
 (?i)loopback
+maintainer's
 markdownlint
 Nygard('s)?
 OAuth
