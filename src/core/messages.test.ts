@@ -18,10 +18,12 @@ import {
   describeStorageDescriptionProblem,
   describeWebIdCheckProblem,
   describeWebIdProblem,
+  describeWriteProblem,
   type Message,
 } from "./messages.ts";
 import type { TurtleProblem } from "./pod-read.ts";
 import type { PodTrustProblem } from "./pod-trust-check.ts";
+import type { WriteProblem } from "./pod-write.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
@@ -378,6 +380,25 @@ describe("describeAccessRulesProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeAccessRulesProblem(problem, url);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeWriteProblem", () => {
+  const url = new URL("https://pod.example/alice/solid-demonstrator/note.txt");
+  const cases: [WriteProblem, RegExp, RegExp][] = [
+    [{ kind: "changed" }, /changed this since you opened it/, /412.+Nothing was overwritten/],
+    [{ kind: "exists" }, /already at this address/, /412.+nothing was replaced/],
+    [{ kind: "not-empty" }, /isn't empty/, /409/],
+    [{ kind: "forbidden" }, /aren't allowed to change/, /or this app/],
+    [{ kind: "not-found" }, /nothing at this address/, /404/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeWriteProblem(problem, url);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);
