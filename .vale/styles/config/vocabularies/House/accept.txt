@@ -20,7 +20,7 @@ OAuth
 pnpm
 Preact
 profile's
-(?i)rebase
+(?i)rebas(e|ed|es|ing)
 request's
 (?i)rulesets?
 shellcheck

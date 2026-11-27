@@ -14,7 +14,7 @@ After a change merges, a maintainer applies it with [`apply.sh`](apply.sh).
   Squash and rebase merges aren't allowed, because they break commit signatures.
 - No approving review is required, because the repository has one maintainer.
 - These CI jobs must pass, and the branch must be up to date with `main` before merging:
-  - from the CI workflow: `Docs lint`, `Docs prose` and `Workflow audit`
+  - from the CI workflow: `Lint`, `Typecheck`, `Test`, `Build`, `Docs lint`, `Docs prose` and `Workflow audit`
   - from the Verify pins workflow: `Verify lockfile` and `Verify SHA pins`
 
   Each check is tied to the GitHub Actions app, so another app can't report a pass.
