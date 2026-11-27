@@ -9,11 +9,13 @@ import {
   describeProfileGaps,
   describeProfileProblem,
   describeReturnProblem,
+  describeWebIdCheckProblem,
   describeWebIdProblem,
   type Message,
 } from "./messages.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
+import type { WebIdCheckProblem } from "./token-webid-check.ts";
 import type { WebIdProblem } from "./webid.ts";
 
 const document = new URL("https://alice.example/profile");
@@ -193,6 +195,44 @@ describe("describeExchangeProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeExchangeProblem(problem, issuer);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeWebIdCheckProblem", () => {
+  const webId = "https://alice.example/profile#me";
+  const cases: [WebIdCheckProblem, string | null, RegExp, RegExp][] = [
+    [{ kind: "no-webid" }, null, /names no WebID/, /didn't say which WebID/],
+    [
+      { kind: "bad-webid", problem: "not-https" },
+      "http://alice.example/",
+      /can't be checked/,
+      /isn't a WebID/,
+    ],
+    [
+      {
+        kind: "profile",
+        document: new URL("https://alice.example/profile"),
+        problem: { kind: "http-error", status: 404 },
+      },
+      webId,
+      /couldn't be read/,
+      /Pod would refuse/,
+    ],
+    [
+      { kind: "issuer-not-named", named: ["https://other.example"] },
+      webId,
+      /doesn't name https:\/\/id\.example/,
+      /names https:\/\/other\.example, but the token is from/,
+    ],
+    [{ kind: "issuer-not-named", named: [] }, webId, /doesn't name/, /names no identity provider/],
+  ];
+  for (const [problem, named, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeWebIdCheckProblem(problem, issuer, named);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

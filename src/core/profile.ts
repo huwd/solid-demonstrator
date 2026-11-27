@@ -9,7 +9,7 @@
 
 import { Parser, type Quad } from "n3";
 import type { Diagnosis, Trace } from "./trace.ts";
-import type { TracedFetch } from "./traced-fetch.ts";
+import type { RequestDescription, TracedFetch } from "./traced-fetch.ts";
 import type { WebIdInput } from "./webid.ts";
 
 export interface WebIdProfile {
@@ -51,6 +51,8 @@ export async function fetchWebIdProfile(
   tracedFetch: TracedFetch,
   input: Pick<Extract<WebIdInput, { ok: true }>, "webId" | "profileDocument">,
   trace: Pick<Trace, "settle">,
+  /** Why the profile is fetched, when it isn't for discovery. */
+  reason?: Pick<RequestDescription, "step" | "purpose">,
 ): Promise<ProfileResult> {
   const response = await tracedFetch({
     describe: {
@@ -62,6 +64,7 @@ export async function fetchWebIdProfile(
       explanation: `The WebID is ${input.webId.href}. Browsers never send the part after #, so the app fetches ${input.profileDocument.href} and looks for the full WebID inside it.`,
       specification:
         "https://www.w3.org/2005/Incubator/webid/spec/identity/#processing-the-webid-profile",
+      ...reason,
     },
     url: input.profileDocument,
     headers: { accept: "text/turtle" },
