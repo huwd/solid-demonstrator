@@ -68,7 +68,13 @@ Checking the DPoP proof and the access rules happen only on the Pod, so those ar
 ### Views
 
 - **Outcome view:** a plain app interface for the WebID, login, Pod browser and notifications.
-- **Plumbing view:** a timeline of trace entries, an inspector for the selected entry, and a sequence diagram of the parties drawn from the trace, with the current or failed step highlighted.
+- **Plumbing view:** pictures first, detail below. It has four layers:
+  - the parties and the flow to expect
+  - a live diagram of the parties as they're discovered
+  - an account of what happened, in plain words
+  - the detailed timeline of trace entries, with an inspector for the selected entry
+
+  Milestone 6 builds the pictures. Until then, the timeline is the plumbing view.
 
 Both views render the same journey and trace. Switching views keeps the person's place.
 
@@ -175,19 +181,30 @@ Outcome 5 (writing).
 
 - Create, edit and delete, with `If-Match` on edits so the Pod refuses a write that would overwrite a newer change.
 
-### 5. The diagram and the two views
-
-- The sequence diagram drawn from the trace, with the current and failed steps highlighted.
-- Switching between outcome and plumbing views at any point.
-
-The timeline from milestone 1 serves as the plumbing view until then.
-
-### 6. Notifications
+### 5. Notifications
 
 Outcome 8.
 
 - Finding the notification service from the storage description.
-- Subscribing with `WebSocketChannel2023`, and showing each notification in both views.
+- Subscribing with `WebSocketChannel2023`, and showing each notification in the outcome view and the timeline.
+
+### 6. Seeing the journey
+
+The plumbing view, drawn as pictures rather than only listed. It comes after reading, writing and notifications, so the pictures are designed around every kind of exchange the demonstrator makes.
+
+- **The parties, and the flow to expect.** Before anything happens, a picture of who a Solid app talks to:
+  - the WebID profile, the identity provider, the Pod and the notification service
+  - how they might be distributed: all in one service, or split, like the reference stack's broker and separate Pod
+
+  It also shows the flow to expect between them: discovery, login, reading and writing, then notifications.
+- **A live diagram of the parties.** Each party appears as it's discovered: the profile first, then the identity providers and Pods it names, then the notification service the Pod describes. Each exchange is drawn between its parties as it happens, with what flowed, such as a token or a resource. Failed exchanges and refusing parties are marked, and the diagram follows the trace's provenance labels, so an explained step never looks observed.
+- **What happened, apart from the detail.** A plain account of the journey's events, such as "Your profile names 2 identity providers", each linked to its entries in the detailed timeline. The current timeline becomes the detail at the bottom.
+- **A sequence diagram drawn from the trace**, as a visual timeline, with the current and failed steps highlighted.
+- **Switching between the outcome and plumbing views** at any point.
+
+Every picture has a text equivalent that a screen reader can follow. Animation is used only to show what moved between parties, and is turned off for people who ask for reduced motion.
+
+Sketches of each picture are agreed with the maintainer before they're built. How the pictures are drawn, such as SVG rendered by Lit or a diagram library, is recorded as a decision at the start of the milestone.
 
 ### 7. Sharing and the tour
 
@@ -204,6 +221,7 @@ Outcome 11's export, and outcome 13.
 Still to record:
 
 - whether `oauth4webapi` or `jose` verifies the access token's signature, in milestone 3
+- how the pictures are drawn, in milestone 6
 
 ## Risks
 
