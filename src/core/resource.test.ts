@@ -35,6 +35,7 @@ describe("readResource", () => {
             "content-length": "8",
             etag: '"v1"',
             "wac-allow": 'user="read write",public=""',
+            link: '<notes.txt.acl>; rel="acl"',
           },
         }),
     );
@@ -47,6 +48,11 @@ describe("readResource", () => {
       size: 8,
       etag: '"v1"',
       access: { user: ["read", "write"], public: [] },
+      links: {
+        isStorage: false,
+        storageDescription: null,
+        accessRules: new URL("https://pod.example/alice/notes.txt.acl"),
+      },
     });
     assert.equal(trace.entries()[0]?.step, "readResource");
     assert.deepEqual(trace.entries()[0]?.verdict, { kind: "as-expected" });

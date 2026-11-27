@@ -36,11 +36,16 @@ interface Options {
       readonly wacAllow?: string;
       readonly contentType?: string;
       readonly etag?: string;
+      /** The Link header; by default, the storage description's, and the root's type. */
+      readonly link?: string;
     }
   >;
+  /** The storage description, as Turtle; by default, one WebSocket subscription service. */
+  readonly storageDescription?: string;
 }
 
 const pod = "https://pod.example/alice/";
+const storageDescription = "https://pod.example/.well-known/solid";
 const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> ;
   <http://www.w3.org/ns/pim/space#storage> <${pod}> .`;
 
@@ -149,8 +154,16 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       headers: {
         ...cors,
         "content-type": "text/turtle",
-        // The browser hides WAC-Allow from the app unless the Pod exposes it, as real Pods do.
-        "access-control-expose-headers": "WAC-Allow, ETag",
+        // The browser hides these from the app unless the Pod exposes them, as real Pods do.
+        "access-control-expose-headers": "WAC-Allow, ETag, Link",
+        link:
+          answer.link ??
+          [
+            `<${storageDescription}>; rel="http://www.w3.org/ns/solid/terms#storageDescription"`,
+            ...(request.url() === pod
+              ? ['<http://www.w3.org/ns/pim/space#Storage>; rel="type"']
+              : []),
+          ].join(", "),
         ...(answer.contentType === undefined ? {} : { "content-type": answer.contentType }),
         ...(answer.etag === undefined ? {} : { etag: answer.etag }),
         ...(answer.wacAllow === undefined ? {} : { "wac-allow": answer.wacAllow }),
@@ -158,6 +171,16 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       body: answer.body ?? "<> a <http://www.w3.org/ns/ldp#BasicContainer> .",
     });
   });
+  await page.route(storageDescription, (route) =>
+    route.fulfill({
+      headers: { ...cors, "content-type": "text/turtle" },
+      body:
+        options.storageDescription ??
+        `@prefix notify: <http://www.w3.org/ns/solid/notifications#> .
+        <> notify:subscription </.notifications/WebSocketChannel2023/> .
+        </.notifications/WebSocketChannel2023/> notify:channelType notify:WebSocketChannel2023 .`,
+    }),
+  );
   return { authorization: () => authorization, tokenRequests, podRequests };
 }
 
@@ -205,8 +228,9 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
   // back, the exchange, the profile again and the WebID check, the
-  // provider's configuration and keys and the token check, then the Pod.
-  await expect(timeline.getByRole("listitem")).toHaveCount(12);
+  // provider's configuration and keys and the token check, then the Pod's
+  // root and its storage description.
+  await expect(timeline.getByRole("listitem")).toHaveCount(13);
   await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(2);
   await expect(page.locator("token-inspector")).toContainText(
     "The token and proof pass the Pod's checks",
@@ -542,6 +566,11 @@ test("browses the Pod as the logged-in person, a folder at a time", async ({ pag
 
   const browser = page.locator("pod-browser");
   await expect(browser.getByRole("heading", { name: "Your Pod" })).toBeVisible();
+  const offers = browser.getByRole("region", { name: "What this Pod offers" });
+  await expect(offers).toContainText(`The Pod describes its storage at ${storageDescription}.`);
+  await expect(offers).toContainText(
+    "https://pod.example/.notifications/WebSocketChannel2023/: WebSocketChannel2023",
+  );
   await expect(
     browser.getByText("Here you may: read, write, append, control. Everyone may: read."),
   ).toBeVisible();
@@ -610,4 +639,13 @@ test("opens a file in the Pod, showing text as text", async ({ page }) => {
     return JSON.parse(Buffer.from(payload, "base64url").toString()).htu;
   });
   expect(proofs).toEqual([pod, `${pod}hello.txt`, `${pod}cat.png`, `${pod}secret.txt`]);
+});
+
+test("says when the Pod links to no storage description", async ({ page }) => {
+  await serveAlice(page, { pod: { [pod]: { link: "" } } });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.locator("pod-browser")).toContainText(
+    "The Pod doesn't link to a storage description",
+  );
 });

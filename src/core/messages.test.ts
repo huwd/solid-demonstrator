@@ -13,10 +13,12 @@ import {
   describeProfileProblem,
   describeRegistrationProblem,
   describeReturnProblem,
+  describeStorageDescriptionProblem,
   describeWebIdCheckProblem,
   describeWebIdProblem,
   type Message,
 } from "./messages.ts";
+import type { TurtleProblem } from "./pod-read.ts";
 import type { PodTrustProblem } from "./pod-trust-check.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
@@ -335,6 +337,24 @@ describe("describePodTrustProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describePodTrustProblem(problem, "https://id.example");
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeStorageDescriptionProblem", () => {
+  const url = new URL("https://pod.example/.well-known/solid");
+  const cases: [TurtleProblem, RegExp, RegExp][] = [
+    [{ kind: "not-turtle", contentType: "text/html" }, /isn't Turtle/, /sent text\/html/],
+    [{ kind: "not-turtle", contentType: null }, /isn't Turtle/, /sent no content type/],
+    [{ kind: "unparseable", message: "line 1" }, /couldn't be read/, /line 1/],
+    [{ kind: "not-found" }, /nothing at this address/, /404/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeStorageDescriptionProblem(problem, url);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

@@ -8,6 +8,7 @@
  */
 
 import { type Access, readWacAllow } from "./container.ts";
+import { readSolidLinks, type SolidLinks } from "./link-header.ts";
 import type { PodFetch } from "./pod-fetch.ts";
 import { type ReadProblem, readStatusProblem } from "./pod-read.ts";
 import type { Trace } from "./trace.ts";
@@ -21,6 +22,7 @@ export interface Resource {
   readonly size: number | null;
   readonly etag: string | null;
   readonly access: Access | null;
+  readonly links: SolidLinks;
 }
 
 export type ResourceResult =
@@ -69,6 +71,7 @@ export async function readResource(
       size: Number.isFinite(length) ? length : null,
       etag: response.headers.get("etag"),
       access: readWacAllow(response.headers.get("wac-allow")),
+      links: readSolidLinks(response.headers.get("link"), response.url),
     },
   };
 }

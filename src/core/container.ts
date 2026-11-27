@@ -7,9 +7,10 @@
  * person may do with it, which the app shows beside the listing.
  */
 
-import { Parser, type Quad } from "n3";
+import type { Quad } from "n3";
+import { readSolidLinks, type SolidLinks } from "./link-header.ts";
 import type { PodFetch } from "./pod-fetch.ts";
-import { type ReadProblem, readStatusProblem } from "./pod-read.ts";
+import { readTurtle, type TurtleProblem } from "./pod-read.ts";
 import type { Trace } from "./trace.ts";
 
 const ldp = "http://www.w3.org/ns/ldp#";
@@ -36,13 +37,10 @@ export interface Container {
   readonly contains: readonly ContainedResource[];
   /** Null if the Pod didn't send WAC-Allow. */
   readonly access: Access | null;
+  readonly links: SolidLinks;
 }
 
-export type ContainerProblem =
-  | ReadProblem
-  | { readonly kind: "not-turtle"; readonly contentType: string | null }
-  | { readonly kind: "unparseable"; readonly message: string }
-  | { readonly kind: "not-a-container" };
+export type ContainerProblem = TurtleProblem | { readonly kind: "not-a-container" };
 
 export type ContainerResult =
   | { readonly ok: true; readonly container: Container }
@@ -66,64 +64,38 @@ export async function readContainer(
     url,
     headers: { accept: "text/turtle" },
   });
-  if (!response.ok) {
-    return { ok: false, problem: { kind: "request-failed", diagnosis: response.diagnosis } };
+  const read = readTurtle(response, trace, "200 with a Turtle listing of the container");
+  if (!read.ok) {
+    return read;
   }
-  const refuse = (problem: ContainerProblem, expected: string, actual: string): ContainerResult => {
-    trace.settle(response.entry.id, { kind: "unexpected", expected, actual });
-    return { ok: false, problem };
-  };
-  const listing = "200 with a Turtle listing of the container";
-
-  const failed = readStatusProblem(response.status);
-  if (failed !== null) {
-    return refuse(failed.problem, listing, failed.actual);
-  }
-  const contentType = response.headers.get("content-type");
-  if (contentType === null || !/^text\/turtle\b/i.test(contentType)) {
-    return refuse(
-      { kind: "not-turtle", contentType },
-      listing,
-      `content type ${contentType ?? "none"}`,
-    );
-  }
-
-  let quads: Quad[];
-  try {
-    quads = new Parser({ baseIRI: response.url.href, format: "text/turtle" }).parse(response.text);
-  } catch (error) {
-    const message = String(error).replace(/^Error: /, "");
-    return refuse(
-      { kind: "unparseable", message },
-      "valid Turtle",
-      `Turtle that can't be read: ${message}`,
-    );
-  }
-
-  const here = response.url.href;
+  const { quads } = read;
+  const here = read.response.url.href;
   const types = (subject: string) =>
     quads
       .filter((quad) => quad.subject.value === subject && quad.predicate.value === rdfType)
       .map((quad) => quad.object.value);
   if (!types(here).some((type) => type === `${ldp}Container` || type === `${ldp}BasicContainer`)) {
-    return refuse(
-      { kind: "not-a-container" },
-      "an LDP container",
-      "a resource that isn't a container",
-    );
+    trace.settle(read.response.entry.id, {
+      kind: "unexpected",
+      expected: "an LDP container",
+      actual: "a resource that isn't a container",
+    });
+    return { ok: false, problem: { kind: "not-a-container" } };
   }
 
   const contains = quads
     .filter((quad) => quad.subject.value === here && quad.predicate.value === `${ldp}contains`)
     .map((quad) => describeContained(quad.object.value, quads, types))
     .sort((a, b) => a.url.href.localeCompare(b.url.href));
-  trace.settle(response.entry.id, { kind: "as-expected" });
+  trace.settle(read.response.entry.id, { kind: "as-expected" });
+  const { url: listed, headers } = read.response;
   return {
     ok: true,
     container: {
-      url: response.url,
+      url: listed,
       contains,
-      access: readWacAllow(response.headers.get("wac-allow")),
+      access: readWacAllow(headers.get("wac-allow")),
+      links: readSolidLinks(headers.get("link"), listed),
     },
   };
 }

@@ -9,7 +9,7 @@
 import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
-import type { ReadProblem } from "./pod-read.ts";
+import type { ReadProblem, TurtleProblem } from "./pod-read.ts";
 import type { BeyondSolidRule, PodTrustProblem } from "./pod-trust-check.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
@@ -470,3 +470,21 @@ const ruleDescriptions: Record<BeyondSolidRule, string> = {
   jti: "It has no jti, an identifier for the token.",
   sub: "It has no sub, as a string, naming who it's about.",
 };
+
+/** Why the storage description couldn't be read. */
+export function describeStorageDescriptionProblem(problem: TurtleProblem, url: URL): Message {
+  switch (problem.kind) {
+    case "not-turtle":
+      return {
+        summary: "The storage description isn't Turtle",
+        detail: `${url.href} sent ${problem.contentType ?? "no content type"}, but the app asked for Turtle.`,
+      };
+    case "unparseable":
+      return {
+        summary: "The storage description couldn't be read",
+        detail: `It isn't valid Turtle: ${problem.message}`,
+      };
+    default:
+      return describeReadProblem(problem, url);
+  }
+}
