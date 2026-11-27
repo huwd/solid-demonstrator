@@ -1,6 +1,6 @@
 # 0012. Test browser behaviour with Playwright, and core logic with node:test
 
-- **Status:** Accepted
+- **Status:** Superseded by [0015](0015-test-against-fictional-and-live-servers.md)
 - **Decided by:** @huwd
 - **Decided:** 2026-11-27
 - **Recorded:** 2026-11-27

@@ -70,6 +70,7 @@ Editorial improvements, such as clearer wording, typo corrections and link fixes
 | [0009](0009-client-id-documents-with-registration-fallback.md) | Identify the app with a Client ID Document, falling back to dynamic registration | Accepted |
 | [0010](0010-lit-and-vite.md) | Build the interface with Lit, bundled by Vite | Accepted |
 | [0011](0011-parse-turtle-with-n3.md) | Parse profiles as Turtle with n3, and ask for Turtle only | Accepted |
-| [0012](0012-playwright-for-browser-tests.md) | Test browser behaviour with Playwright, and core logic with node:test | Accepted |
+| [0012](0012-playwright-for-browser-tests.md) | Test browser behaviour with Playwright, and core logic with node:test | Superseded by [0015](0015-test-against-fictional-and-live-servers.md) |
 | [0013](0013-deploy-to-github-pages.md) | Deploy to GitHub Pages from main, in the only workflow that can write | Accepted |
 | [0014](0014-oauth4webapi-for-oauth-steps.md) | Use oauth4webapi for PKCE, DPoP and token requests, through the traced fetch | Accepted |
+| [0015](0015-test-against-fictional-and-live-servers.md) | Test against fictional and live servers, without a local stack for now | Accepted |
