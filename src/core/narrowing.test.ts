@@ -50,8 +50,10 @@ describe("wacExample", () => {
 });
 
 describe("hasStableClientId", () => {
-  it("accepts only an https URL", () => {
+  it("accepts a Client ID Document's URL, but not a registered identifier", () => {
     assert.equal(hasStableClientId("https://app.example/clientid.jsonld"), true);
-    assert.equal(hasStableClientId("http://localhost/clientid.jsonld"), false);
+    assert.equal(hasStableClientId("http://localhost:5173/clientid.jsonld"), true);
+    assert.equal(hasStableClientId("urn:uuid:f6c2d1"), false);
+    assert.equal(hasStableClientId("https://"), false);
   });
 });

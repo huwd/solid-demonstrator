@@ -4,9 +4,19 @@ import {
   describeContainerProblem,
   describeReadProblem,
   describeStorageDescriptionProblem,
+  describeWriteProblem,
   type Message,
 } from "../core/messages.ts";
+import { acpExample, wacExample } from "../core/narrowing.ts";
 import type { PodFetch } from "../core/pod-fetch.ts";
+import {
+  createResource,
+  deleteResource,
+  ensureScratchFolder,
+  isInside,
+  updateResource,
+  type WriteProblem,
+} from "../core/pod-write.ts";
 import { type ResourceResult, readResource } from "../core/resource.ts";
 import {
   localName,
@@ -31,6 +41,14 @@ export class PodBrowser extends LitElement {
     viewing: { state: true },
     resource: { state: true },
     description: { state: true },
+    webId: { attribute: false },
+    clientId: { attribute: false },
+    scratch: { state: true },
+    allowElsewhere: { state: true },
+    editing: { state: true },
+    confirmingDelete: { state: true },
+    writeProblem: { state: true },
+    busy: { state: true },
   };
 
   declare podFetch: PodFetch | null;
@@ -46,6 +64,21 @@ export class PodBrowser extends LitElement {
   declare resource: ResourceResult | null;
   /** What the storage offers; "none" if the Pod links to no description; null until read. */
   declare description: StorageDescriptionResult | "none" | null;
+  declare webId: string | null;
+  /** The access token's client_id, for the example rules. */
+  declare clientId: string | null;
+  /** The scratch folder, once the person has asked to use it (decision 0017). */
+  declare scratch:
+    | { readonly ok: true; readonly url: URL; readonly created: boolean }
+    | { readonly ok: false; readonly problem: WriteProblem }
+    | null;
+  /** The app's own safeguard: off after each login. */
+  declare allowElsewhere: boolean;
+  declare editing: boolean;
+  /** The resource the person has asked to delete, awaiting confirmation. */
+  declare confirmingDelete: URL | null;
+  declare writeProblem: { readonly url: URL; readonly problem: WriteProblem } | null;
+  declare busy: boolean;
 
   static override styles = css`
     :host {
@@ -85,6 +118,15 @@ export class PodBrowser extends LitElement {
       font-weight: bold;
       margin: 0;
     }
+    textarea {
+      width: 100%;
+      min-height: 8rem;
+      font-family: monospace;
+    }
+    label {
+      display: block;
+      margin-top: 0.5rem;
+    }
     pre {
       white-space: pre-wrap;
       overflow-wrap: anywhere;
@@ -105,11 +147,21 @@ export class PodBrowser extends LitElement {
     this.viewing = null;
     this.resource = null;
     this.description = null;
+    this.webId = null;
+    this.clientId = null;
+    this.scratch = null;
+    this.allowElsewhere = false;
+    this.editing = false;
+    this.confirmingDelete = null;
+    this.writeProblem = null;
+    this.busy = false;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has("root") && this.root !== null) {
       this.description = null;
+      this.scratch = null;
+      this.allowElsewhere = false;
       void this.#open(this.root);
     }
   }
@@ -127,6 +179,7 @@ export class PodBrowser extends LitElement {
         proof. The timeline shows every request.
       </p>
       ${this.#renderDescription()}
+      ${this.#renderWriting(root)}
       ${this.#renderPath(root, current)}
       ${
         this.viewing !== null
@@ -226,6 +279,12 @@ export class PodBrowser extends LitElement {
               )}
             </ul>`
       }
+      ${this.#renderCreate(current)}
+      ${
+        current.href === this.root?.href || !this.#canWrite(current)
+          ? nothing
+          : this.#renderDelete(current, null, "Delete this folder")
+      }
     `;
   }
 
@@ -253,9 +312,257 @@ export class PodBrowser extends LitElement {
       ${
         text === null
           ? html`<p>The app shows only text, so it doesn't show this resource's content.</p>`
-          : html`<pre tabindex="0" aria-label="Content of ${nameOf(url, container)}">${text}</pre>`
+          : this.editing
+            ? nothing
+            : html`<pre tabindex="0" aria-label="Content of ${nameOf(url, container)}">${text}</pre>`
       }
+      ${this.#renderChanges(url, resource.resource.contentType, text, etag)}
     `;
+  }
+
+  #canWrite(url: URL): boolean {
+    return this.allowElsewhere || (this.scratch?.ok === true && isInside(url, this.scratch.url));
+  }
+
+  #renderWriting(root: URL): TemplateResult {
+    const scratch = this.scratch;
+    return html`<section aria-label="Changing your Pod">
+      <h3>Changing your Pod</h3>
+      <p>
+        Logging in doesn't limit what the app could change: the Pod lets it do whatever you may.
+        The app therefore writes in a folder of its own, solid-demonstrator/, unless you allow it to
+        change things elsewhere.
+      </p>
+      ${
+        scratch === null
+          ? html`<p><button ?disabled=${this.busy} @click=${() => this.#useScratch(root)}>Use the scratch folder</button></p>`
+          : scratch.ok
+            ? html`<p>
+                ${scratch.created ? "The app created" : "The app found"}
+                <button class="link" @click=${() => this.#open(scratch.url)}>${scratch.url.href}</button>.
+              </p>`
+            : problem(describeWriteProblem(scratch.problem, new URL("solid-demonstrator/", root)))
+      }
+      <label>
+        <input
+          type="checkbox"
+          .checked=${this.allowElsewhere}
+          @change=${(event: Event) => {
+            this.allowElsewhere = (event.target as HTMLInputElement).checked;
+          }}
+        />
+        Allow changes outside the scratch folder, until you log out
+      </label>
+      <p>
+        This switch is the app's own safeguard. The Pod would allow these changes anyway, unless
+        its access rules say otherwise.
+      </p>
+      ${this.#renderNarrowing(root)}
+    </section>`;
+  }
+
+  #renderNarrowing(root: URL): TemplateResult {
+    const subject = {
+      webId: this.webId ?? "",
+      clientId: this.clientId,
+      origin: location.origin,
+      folder: new URL("solid-demonstrator/", root),
+    };
+    const acp = acpExample(subject);
+    return html`<details>
+      <summary>Narrow this app's access in your Pod</summary>
+      <p>
+        The Pod decides every request from its access rules, so that's where to limit this app.
+        The token names it as ${this.clientId ?? "no client"}. These examples let only this app,
+        acting as you, read and write the scratch folder. They narrow the app only if no other rule
+        lets you in through any app, so rules elsewhere need to name the apps they're for too. The
+        app never changes access rules itself.
+      </p>
+      <h4>Access Control Policies</h4>
+      ${
+        acp === null
+          ? html`<p>
+              The app was registered with your provider for this login, so its client identifier
+              changes, and ACP has nothing stable to name.
+            </p>`
+          : html`<pre tabindex="0" aria-label="Example ACP rules">${acp}</pre>`
+      }
+      <h4>Web Access Control</h4>
+      <p>
+        acl:origin limits the rule to apps served from ${location.origin}. Check your server
+        enforces acl:origin before relying on it.
+      </p>
+      <pre tabindex="0" aria-label="Example WAC rules">${wacExample(subject)}</pre>
+    </details>`;
+  }
+
+  #renderCreate(container: URL): TemplateResult {
+    if (!this.#canWrite(container)) {
+      return html`<p>
+        To create something here, use the scratch folder, or allow changes outside it.
+      </p>`;
+    }
+    return html`<form aria-label="Create" @submit=${(event: SubmitEvent) => this.#create(event, container)}>
+      <h4>Create something here</h4>
+      <label>Name <input name="name" required pattern="[^/]+" /></label>
+      <label>
+        Kind
+        <select name="kind">
+          <option value="text/plain">Text file</option>
+          <option value="text/turtle">Turtle file</option>
+          <option value="folder">Folder</option>
+        </select>
+      </label>
+      <label>Content <textarea name="content"></textarea></label>
+      <p><button ?disabled=${this.busy}>Create</button></p>
+      ${this.#renderWriteProblem(container)}
+    </form>`;
+  }
+
+  #renderChanges(
+    url: URL,
+    contentType: string | null,
+    text: string | null,
+    etag: string | null,
+  ): TemplateResult {
+    if (!this.#canWrite(url)) {
+      return html`<p>
+        This is outside the scratch folder. Allow changes outside it to edit or delete it.
+      </p>`;
+    }
+    const edit =
+      text === null
+        ? nothing
+        : etag === null
+          ? html`<p>
+              The Pod sent no ETag, so the app won't edit this: it couldn't stop the edit
+              overwriting someone else's change.
+            </p>`
+          : this.editing
+            ? html`<form
+                aria-label="Edit"
+                @submit=${(event: SubmitEvent) => this.#save(event, url, etag, contentType ?? "text/plain")}
+              >
+                <label>Content <textarea name="content" .value=${text}></textarea></label>
+                <p>
+                  <button ?disabled=${this.busy}>Save</button>
+                  <button type="button" @click=${() => {
+                    this.editing = false;
+                  }}>Cancel</button>
+                </p>
+              </form>`
+            : html`<p><button @click=${() => {
+                this.editing = true;
+                this.writeProblem = null;
+              }}>Edit</button></p>`;
+    return html`${edit}${this.#renderDelete(url, etag, "Delete")}${this.#renderWriteProblem(url)}`;
+  }
+
+  #renderDelete(url: URL, etag: string | null, label: string): TemplateResult {
+    if (this.confirmingDelete?.href !== url.href) {
+      return html`<p><button @click=${() => {
+        this.confirmingDelete = url;
+        this.writeProblem = null;
+      }}>${label}</button></p>`;
+    }
+    return html`<div role="alertdialog" aria-label="Confirm delete">
+      <p>Delete ${url.href}? This can't be undone.</p>
+      <p>
+        <button ?disabled=${this.busy} @click=${() => this.#delete(url, etag)}>Yes, delete it</button>
+        <button @click=${() => {
+          this.confirmingDelete = null;
+        }}>Cancel</button>
+      </p>
+    </div>`;
+  }
+
+  #renderWriteProblem(url: URL): TemplateResult | typeof nothing {
+    const failed = this.writeProblem;
+    return failed === null || failed.url.href !== url.href
+      ? nothing
+      : problem(describeWriteProblem(failed.problem, failed.url));
+  }
+
+  async #useScratch(root: URL): Promise<void> {
+    if (this.podFetch === null || this.trace === null) {
+      return;
+    }
+    this.busy = true;
+    this.scratch = await ensureScratchFolder(this.podFetch, root, this.trace);
+    this.busy = false;
+    if (this.scratch.ok) {
+      await this.#open(this.scratch.url);
+    }
+  }
+
+  async #create(event: SubmitEvent, container: URL): Promise<void> {
+    event.preventDefault();
+    if (this.podFetch === null || this.trace === null) {
+      return;
+    }
+    const form = new FormData(event.target as HTMLFormElement);
+    const name = String(form.get("name"));
+    const kind = String(form.get("kind"));
+    const folder = kind === "folder";
+    const url = new URL(`${encodeURIComponent(name)}${folder ? "/" : ""}`, container);
+    this.busy = true;
+    const result = await createResource(
+      this.podFetch,
+      url,
+      folder
+        ? { contentType: "text/turtle", body: "" }
+        : { contentType: kind, body: String(form.get("content")) },
+      this.trace,
+    );
+    this.busy = false;
+    if (!result.ok) {
+      this.writeProblem = { url: container, problem: result.problem };
+      return;
+    }
+    this.writeProblem = null;
+    await this.#open(container);
+  }
+
+  async #save(event: SubmitEvent, url: URL, etag: string, contentType: string): Promise<void> {
+    event.preventDefault();
+    if (this.podFetch === null || this.trace === null) {
+      return;
+    }
+    const content = String(new FormData(event.target as HTMLFormElement).get("content"));
+    this.busy = true;
+    const result = await updateResource(
+      this.podFetch,
+      url,
+      etag,
+      { contentType, body: content },
+      this.trace,
+    );
+    this.busy = false;
+    if (!result.ok) {
+      this.writeProblem = { url, problem: result.problem };
+      return;
+    }
+    this.editing = false;
+    this.writeProblem = null;
+    await this.#view(url);
+  }
+
+  async #delete(url: URL, etag: string | null): Promise<void> {
+    if (this.podFetch === null || this.trace === null || this.current === null) {
+      return;
+    }
+    this.busy = true;
+    const result = await deleteResource(this.podFetch, url, etag, this.trace);
+    this.busy = false;
+    this.confirmingDelete = null;
+    if (!result.ok) {
+      this.writeProblem = { url, problem: result.problem };
+      return;
+    }
+    this.writeProblem = null;
+    // After deleting a folder, go up to the folder that held it.
+    const parent = url.href === this.current.href ? new URL("../", url) : this.current;
+    await this.#open(parent);
   }
 
   #renderRules(resource: URL, rulesUrl: URL | null, access: Access | null): TemplateResult {
@@ -274,6 +581,8 @@ export class PodBrowser extends LitElement {
     }
     this.viewing = url;
     this.resource = null;
+    this.editing = false;
+    this.confirmingDelete = null;
     const resource = await readResource(this.podFetch, url, this.trace);
     if (this.viewing === url) {
       this.resource = resource;
@@ -283,6 +592,9 @@ export class PodBrowser extends LitElement {
   #closeResource(): void {
     this.viewing = null;
     this.resource = null;
+    this.editing = false;
+    this.confirmingDelete = null;
+    this.writeProblem = null;
   }
 
   async #open(url: URL): Promise<void> {
@@ -293,6 +605,8 @@ export class PodBrowser extends LitElement {
     this.result = null;
     this.viewing = null;
     this.resource = null;
+    this.editing = false;
+    this.confirmingDelete = null;
     const result = await readContainer(this.podFetch, url, this.trace);
     // Only show the answer for the folder still being looked at.
     if (this.current === url) {

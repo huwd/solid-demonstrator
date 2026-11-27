@@ -53,7 +53,10 @@ export function wacExample(subject: NarrowingSubject): string {
 `;
 }
 
-/** Whether ACP can name the app: only a Client ID Document's URL stays the same between logins. */
+/**
+ * Whether ACP can name the app: only a Client ID Document's URL stays the
+ * same between logins. An identifier from registration isn't a URL.
+ */
 export function hasStableClientId(clientId: string | null): clientId is string {
-  return clientId !== null && /^https:\/\//.test(clientId);
+  return clientId !== null && /^https?:\/\//.test(clientId) && URL.canParse(clientId);
 }
