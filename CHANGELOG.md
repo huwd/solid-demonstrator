@@ -15,6 +15,7 @@ Each change adds its entry under Unreleased when it merges. No version has been 
 - Plain explanations of what went wrong, with what to check. For example: a profile that names no identity provider or Pod, a provider whose name differs from the profile's only by a trailing slash, or a server that returned an error.
 - A diagnosis when the browser hides why a request failed: a timeout, a server that couldn't be reached, or a response blocked most likely by CORS. Each is labelled as a diagnosis, not a certainty.
 - A timeline of every exchange, in order. Each entry shows who talked to whom and why, how the step is known, and whether it went as expected. Opening an entry shows the request, the response, an explanation and the specification. Credentials are hidden or shortened before anything is recorded. Entries that failed or weren't as expected are marked.
+- A Client ID Document at `clientid.jsonld` beside the app, which login will use to tell identity providers who the app is. The build writes it from `SITE_URL`, so it names the address the app is served from. It asks for the `webid` scope, and not for refresh tokens, since tokens are kept only in memory.
 - The app is published to GitHub Pages from `main`, at the address in the `SITE_URL` repository variable. See [decision 0013](docs/decisions/0013-deploy-to-github-pages.md).
 
 [Unreleased]: https://github.com/huwd/solid-demonstrator/commits/main
