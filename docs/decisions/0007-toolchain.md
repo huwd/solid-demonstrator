@@ -13,7 +13,7 @@ One thing differs: Vale prose errors fail the build here, in `devenv test` and i
 
 ## Context
 
-The demonstrator sits beside solid-oidc and the composer deployment, maintained by the same person with coding agents.
+The demonstrator sits beside solid-oidc and the reference stack's deployment, maintained by the same person with coding agents.
 Shared conventions mean one set of habits across the three, and solid-oidc's tooling already exists to copy.
 
 The demonstrator is mostly explanation.

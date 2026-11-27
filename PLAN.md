@@ -121,7 +121,7 @@ Following solid-oidc's [decision 0010](https://github.com/huwd/solid-oidc/blob/m
 - **Real servers:** a Docker Compose environment with:
   - the solid-oidc broker and its sandbox, for a split stack with an upstream login
   - a Community Solid Server with its own identity provider, for a single-service stack, and for dynamic registration if it offers it; otherwise another identity provider that does
-  - a Community Solid Server with identity disabled, trusting the broker, matching the stack in [composer](https://github.com/huwd/composer)
+  - a Community Solid Server with identity disabled, trusting the broker, matching the reference stack's Pod
   - static WebID profiles covering the cases in outcome 2: one issuer, several issuers, several Pods, and none
 - **Fixtures:** recorded responses from real servers, for failures a real server won't produce on demand. Each fixture records where and when it was captured.
 - **End to end:** the full journey in a browser against the Compose environment.
