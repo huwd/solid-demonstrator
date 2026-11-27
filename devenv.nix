@@ -31,6 +31,11 @@
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
     PLAYWRIGHT_NIX_VERSION = pkgs.playwright-driver.version;
+    # WebKit needs an EGL driver even when headless. NixOS has one in
+    # /run/opengl-driver, but other Linux hosts, such as CI's Ubuntu runners,
+    # have none that Nix builds can load. playwright.config.ts points WebKit,
+    # and only WebKit, at Mesa from nixpkgs.
+    PLAYWRIGHT_MESA = "${pkgs.mesa}";
   };
 
   # `devenv test` is the build: the same checks contributors run with

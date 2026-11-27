@@ -98,17 +98,7 @@ jobs:
             extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
       - run: nix profile install nixpkgs#devenv
       - run: devenv shell -- pnpm install --frozen-lockfile
-      # Ubuntu's AppArmor stops unprivileged processes creating user
-      # namespaces, which WebKit's sandbox needs; nixpkgs' WebKit has no
-      # AppArmor profile to exempt it. Lift the restriction on this
-      # throwaway runner only.
-      - run: |
-          sysctl kernel.apparmor_restrict_unprivileged_userns || true
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: devenv shell -- pnpm run test:browser
-        env:
-          # Shows a browser's own output in the log if it fails to start.
-          DEBUG: pw:browser
 
   docs:
     name: Docs lint

@@ -21,6 +21,21 @@ if (nixVersion !== undefined && nixVersion !== installed) {
 // deployed rather than the development server.
 const port = 4173;
 
+// Mesa from nixpkgs, so WebKit can create an EGL display on any Linux host.
+// See devenv.nix.
+const mesa = process.env["PLAYWRIGHT_MESA"];
+const webkitEnv =
+  mesa === undefined
+    ? {}
+    : {
+        env: {
+          ...process.env,
+          __EGL_VENDOR_LIBRARY_FILENAMES: `${mesa}/share/glvnd/egl_vendor.d/50_mesa.json`,
+          LIBGL_DRIVERS_PATH: `${mesa}/lib/dri`,
+          GBM_BACKENDS_PATH: `${mesa}/lib/gbm`,
+        },
+      };
+
 export default defineConfig({
   testDir: "src/app",
   testMatch: "**/*.spec.ts",
@@ -30,7 +45,7 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"], launchOptions: webkitEnv } },
   ],
   webServer: {
     command: `vite build && vite preview --host 127.0.0.1 --port ${port} --strictPort`,
