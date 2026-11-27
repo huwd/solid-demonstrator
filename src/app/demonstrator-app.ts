@@ -4,6 +4,7 @@ import { describeWebIdProblem } from "../core/messages.ts";
 import { createTrace } from "../core/trace.ts";
 import { createTracedFetch } from "../core/traced-fetch.ts";
 import "./discovery-results.ts";
+import "./trace-timeline.ts";
 
 type State =
   | { readonly kind: "idle" }
@@ -127,6 +128,19 @@ export class DemonstratorApp extends LitElement {
           state.kind === "done"
             ? html`<discovery-results .result=${state.result}></discovery-results>`
             : nothing
+        }
+
+        ${
+          state.kind === "idle"
+            ? nothing
+            : html`
+              <h2>Every exchange so far</h2>
+              <p>
+                Each request the app made, in order. Open one to see what was sent and what came
+                back. Secrets are hidden or shortened before anything is recorded.
+              </p>
+              <trace-timeline .trace=${this.#trace}></trace-timeline>
+            `
         }
       </main>
     `;

@@ -100,7 +100,8 @@ test("explains each provider that can't be used, and what the profile lacks", as
     page.getByText("The profile and the provider disagree about a trailing slash"),
   ).toBeVisible();
   // A profile's Pod address is shown, but never as a javascript: link.
-  await expect(page.getByText("javascript:alert(1)")).toBeVisible();
+  const results = page.locator("discovery-results");
+  await expect(results.getByText("javascript:alert(1)")).toBeVisible();
   await expect(page.getByRole("link", { name: /javascript/ })).toHaveCount(0);
 });
 
