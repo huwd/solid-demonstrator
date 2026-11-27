@@ -15,6 +15,8 @@ export interface SavedLogin {
   readonly pending: PendingLogin;
   /** The trace before the redirect, already redacted. */
   readonly entries: readonly TraceEntry[];
+  /** The Pod the person chose, to read once they're logged in; null if the profile names none. */
+  readonly storage: string | null;
 }
 
 /** The part of the Web Storage interface the app uses. */
@@ -61,8 +63,11 @@ function isSavedLogin(value: unknown): value is SavedLogin {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  const { pending, entries } = value as Record<string, unknown>;
+  const { pending, entries, storage } = value as Record<string, unknown>;
   if (typeof pending !== "object" || pending === null || !Array.isArray(entries)) {
+    return false;
+  }
+  if (storage !== null && typeof storage !== "string") {
     return false;
   }
   const fields = pending as Record<string, unknown>;

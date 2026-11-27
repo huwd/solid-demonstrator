@@ -476,7 +476,11 @@ export class DemonstratorApp extends LitElement {
       }
     }
     const prepared = await prepareLogin(configuration, { clientId, redirectUri: site.href });
-    const saved: SavedLogin = { pending: prepared.pending, entries: this.#trace.entries() };
+    const saved: SavedLogin = {
+      pending: prepared.pending,
+      entries: this.#trace.entries(),
+      storage: state.choice.storage,
+    };
     try {
       saveLogin(sessionStorage, saved);
     } catch {
