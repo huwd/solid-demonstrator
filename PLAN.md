@@ -174,6 +174,7 @@ Outcomes 5 (reading), 6 and 7.
 - The storage description, browsing containers and viewing resources.
 - The repeated checks of the Pod's trust in the token.
 - Explanations for `401` and `403`, and viewing access rules where the person has Control access.
+- Both access control systems the Solid Protocol allows: Web Access Control (WAC), with its `.acl` documents, and Access Control Policies (ACP), with its access control resources. The app finds a resource's rules from its `Link: rel="acl"` header, tells the two apart by what the linked document says it is, and explains whichever the Pod uses. It assumes neither.
 
 ### 4. Writing to the Pod
 
@@ -226,4 +227,5 @@ Still to record:
 
 - **Hosted providers behave differently.** Providers differ in CORS headers, token claims and notification support. Testing against at least one hosted provider from milestone 2 onwards catches this early.
 - **Explained steps drift from reality.** An explanation of what a server does can become wrong when the server changes. Each explained entry links the specification it relies on. Recorded fixtures say which server, and when, they were captured from.
+- **Assuming one access control system.** Pods use WAC or ACP, and the Community Solid Server can run either. The `WAC-Allow` header is defined by WAC, so whether a Pod running ACP sends it has to be checked against a live server, not assumed. The tests cover a fictional Pod of each kind, and a live ACP Pod is checked by hand.
 - **Scope creep towards a full Pod browser.** Outcome 5 is limited to what shows the plumbing. Features beyond that need a reason tied to the outcomes.
