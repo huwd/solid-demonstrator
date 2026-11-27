@@ -3,13 +3,20 @@ import { type Choice, choose, initialChoice } from "../core/choice.ts";
 import { clientIdDocumentPath } from "../core/client-id.ts";
 import { type DiscoveryResult, discover } from "../core/discovery.ts";
 import type { IssuerConfiguration } from "../core/issuer.ts";
-import { prepareLogin } from "../core/login.ts";
-import { isLoginReturn, type ReturnResult, returnFromLogin } from "../core/login-return.ts";
+import { generateDpopKeyPair, type PendingLogin, prepareLogin } from "../core/login.ts";
+import { isLoginReturn, returnFromLogin } from "../core/login-return.ts";
 import { type SavedLogin, saveLogin, takeLogin } from "../core/login-storage.ts";
-import { describeReturnProblem, describeWebIdProblem, type Message } from "../core/messages.ts";
+import {
+  describeExchangeProblem,
+  describeReturnProblem,
+  describeWebIdProblem,
+  type Message,
+} from "../core/messages.ts";
+import { exchangeCode, type Session } from "../core/token-exchange.ts";
 import { createTrace, type Trace } from "../core/trace.ts";
 import { createTracedFetch, type TracedFetch } from "../core/traced-fetch.ts";
 import type { ChooseEvent } from "./discovery-results.ts";
+import { loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
 import "./discovery-results.ts";
 import "./trace-timeline.ts";
 
@@ -24,15 +31,17 @@ type State =
       readonly loginProblem: Message | null;
     }
   | { readonly kind: "leaving"; readonly issuer: string }
-  | { readonly kind: "returned"; readonly issuer: string; readonly result: ReturnResult }
+  | { readonly kind: "exchanging"; readonly issuer: string }
+  /** Logged in. The session, and its token, are held only here, in memory (decision 0008). */
+  | { readonly kind: "logged-in"; readonly session: Session }
+  | { readonly kind: "login-failed"; readonly message: Message }
   /** A login response arrived, but this tab started no login. */
   | { readonly kind: "unexpected-return" };
 
 /**
  * The demonstrator's root element: the start page's introduction, the
- * WebID form, what discovery finds, and login as far as the person coming
- * back from their identity provider. The code exchange and the Pod views
- * arrive in later pull requests (see PLAN.md).
+ * WebID form, what discovery finds, and login. The Pod views arrive in
+ * later milestones (see PLAN.md).
  */
 export class DemonstratorApp extends LitElement {
   static override properties = { state: { state: true } };
@@ -132,14 +141,34 @@ export class DemonstratorApp extends LitElement {
     }
     // The code can be used only once, so a reload shouldn't offer it again.
     history.replaceState(null, "", here.pathname);
-    this.state =
-      saved === null
-        ? { kind: "unexpected-return" }
-        : {
-            kind: "returned",
-            issuer: saved.pending.issuer,
-            result: returnFromLogin(saved.pending, here, this.#trace),
-          };
+    if (saved === null) {
+      this.state = { kind: "unexpected-return" };
+      return;
+    }
+    const { pending } = saved;
+    const result = returnFromLogin(pending, here, this.#trace);
+    if (!result.ok) {
+      this.state = {
+        kind: "login-failed",
+        message: describeReturnProblem(result.problem, pending.issuer),
+      };
+      return;
+    }
+    this.state = { kind: "exchanging", issuer: pending.issuer };
+    void this.#exchange(pending, result.parameters);
+  }
+
+  async #exchange(pending: PendingLogin, callback: URLSearchParams): Promise<void> {
+    const result = await exchangeCode(
+      this.#tracedFetch,
+      pending,
+      callback,
+      await dpopKeyPair(),
+      this.#trace,
+    );
+    this.state = result.ok
+      ? { kind: "logged-in", session: result.session }
+      : { kind: "login-failed", message: describeExchangeProblem(result.problem, pending.issuer) };
   }
 
   override render() {
@@ -274,20 +303,26 @@ export class DemonstratorApp extends LitElement {
             to check it against, so the app won't use it. Enter a WebID to start again.
           </p>
         </div>`;
-      case "returned": {
-        if (!state.result.ok) {
-          const message = describeReturnProblem(state.result.problem, state.issuer);
-          return html`<div class="problem" role="alert">
-            <p class="summary">${message.summary}</p>
-            <p>${message.detail}</p>
-          </div>`;
-        }
+      case "exchanging":
+        return html`<p role="status">Back from ${state.issuer}. Exchanging the code for tokens…</p>`;
+      case "login-failed":
+        return html`<div class="problem" role="alert">
+          <p class="summary">${state.message.summary}</p>
+          <p>${state.message.detail}</p>
+        </div>`;
+      case "logged-in": {
+        const { session } = state;
         return html`<div class="ready">
-          <p class="summary">Back from ${state.issuer}</p>
+          <p class="summary">
+            ${session.webId === null ? "Logged in, but the ID token names no WebID" : `Logged in as ${session.webId}`}
+          </p>
           <p>
-            The response is the one the app asked for: its state matches, and it names the provider
-            you chose. Next, the app would exchange the one-time code for tokens. That step arrives
-            in a later version.
+            ${session.issuer} gave the app an access token bound to its DPoP key${
+              session.expiresAt === null
+                ? ""
+                : `, which expires at ${session.expiresAt.toLocaleTimeString("en-GB")}`
+            }. The token is kept only in this page's memory, so reloading the page means logging in
+            again.
           </p>
         </div>`;
       }
@@ -338,6 +373,28 @@ function chosenConfiguration(state: State & { kind: "done" }): IssuerConfigurati
   const issuer = state.choice.issuer;
   const finding = state.result.providers.find((provider) => provider.issuer === issuer);
   return finding?.result.ok === true ? finding.result.configuration : null;
+}
+
+/**
+ * The key pair kept from an earlier login, or a new one, kept for next time.
+ * If IndexedDB is unavailable the new key is used for this login only.
+ */
+async function dpopKeyPair(): Promise<CryptoKeyPair> {
+  try {
+    const stored = await loadDpopKeyPair();
+    if (stored !== null) {
+      return stored;
+    }
+  } catch {
+    // Storage is blocked: make a key for this login only.
+  }
+  const keyPair = await generateDpopKeyPair();
+  try {
+    await saveDpopKeyPair(keyPair);
+  } catch {
+    // As above: the key still works, but isn't kept.
+  }
+  return keyPair;
 }
 
 /** The login saved before the redirect, or null if there isn't one or storage is blocked. */

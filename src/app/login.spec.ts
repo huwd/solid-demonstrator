@@ -1,8 +1,10 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, type Request, test } from "@playwright/test";
+import { signTestJwt } from "../core/test-support/tokens.ts";
 
 // A fictional person and identity provider, answered by Playwright inside
 // the browser (decisions 0003 and 0015). The provider's login page is a
-// stand-in with two links, so a test can allow or decline.
+// stand-in with two links, so a test can allow or decline, and its token
+// endpoint signs real tokens with a test key.
 const alice = "https://alice.example/profile";
 const issuer = "https://id.example";
 const cors = { "access-control-allow-origin": "*" };
@@ -10,19 +12,29 @@ const cors = { "access-control-allow-origin": "*" };
 interface Provider {
   /** The authorization request the provider received, once it has. */
   readonly authorization: () => URL | null;
+  /** The token requests the provider received. */
+  readonly tokenRequests: readonly Request[];
 }
 
-async function serveAlice(
-  page: Page,
-  discoveryExtra: Record<string, unknown> = {},
-  answer: (request: URL) => URLSearchParams = (request) =>
-    new URLSearchParams({
-      code: "one-time-code-0123456789",
-      state: request.searchParams.get("state") ?? "",
-      iss: issuer,
-    }),
-): Promise<Provider> {
+interface Options {
+  readonly discovery?: Record<string, unknown>;
+  readonly answer?: (request: URL) => URLSearchParams;
+  /** Replaces the token response's fields. */
+  readonly tokens?: Record<string, unknown>;
+  readonly tokenStatus?: number;
+}
+
+const answerWithCode = (request: URL) =>
+  new URLSearchParams({
+    code: "one-time-code-0123456789",
+    state: request.searchParams.get("state") ?? "",
+    iss: issuer,
+  });
+
+async function serveAlice(page: Page, options: Options = {}): Promise<Provider> {
+  const answer = options.answer ?? answerWithCode;
   let authorization: URL | null = null;
+  const tokenRequests: Request[] = [];
   await page.route(alice, (route) =>
     route.fulfill({
       headers: { ...cors, "content-type": "text/turtle" },
@@ -42,7 +54,8 @@ async function serveAlice(
         dpop_signing_alg_values_supported: ["ES256"],
         client_id_metadata_document_supported: true,
         authorization_response_iss_parameter_supported: true,
-        ...discoveryExtra,
+        id_token_signing_alg_values_supported: ["ES256"],
+        ...options.discovery,
       },
     }),
   );
@@ -61,8 +74,30 @@ async function serveAlice(
       body: `<!doctype html><title>Log in</title><a href="${allow}">Allow</a> <a href="${decline}">Decline</a>`,
     });
   });
-  return { authorization: () => authorization };
+  await page.route(`${issuer}/token`, async (route) => {
+    tokenRequests.push(route.request());
+    const now = Math.floor(Date.now() / 1000);
+    const sent = authorization?.searchParams;
+    const body = {
+      access_token: await signTestJwt({ webid: webId, exp: now + 300 }),
+      id_token: await signTestJwt({
+        aud: sent?.get("client_id"),
+        sub: webId,
+        webid: webId,
+        nonce: sent?.get("nonce"),
+        iat: now,
+        exp: now + 300,
+      }),
+      token_type: "DPoP",
+      expires_in: 300,
+      ...options.tokens,
+    };
+    return route.fulfill({ status: options.tokenStatus ?? 200, headers: cors, json: body });
+  });
+  return { authorization: () => authorization, tokenRequests };
 }
+
+const webId = `${alice}#me`;
 
 async function discoverAlice(page: Page): Promise<void> {
   await page.goto("/");
@@ -75,7 +110,7 @@ async function logIn(page: Page, choice: "Allow" | "Decline"): Promise<void> {
   await page.getByRole("link", { name: choice }).click();
 }
 
-test("sends the person to their provider, and checks the response when they return", async ({
+test("logs the person in, through their provider, with a DPoP-bound token", async ({
   page,
   baseURL,
 }) => {
@@ -85,7 +120,8 @@ test("sends the person to their provider, and checks the response when they retu
 
   await logIn(page, "Allow");
 
-  await expect(page.getByText(`Back from ${issuer}`)).toBeVisible();
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  await expect(page.getByText(/bound to its DPoP key, which expires at/)).toBeVisible();
   expect(new URL(page.url()).search, "the code is removed from the address").toBe("");
 
   const sent = provider.authorization();
@@ -103,10 +139,60 @@ test("sends the person to their provider, and checks the response when they retu
   const timeline = page.locator("trace-timeline");
   await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
-  // The entries from before the redirect are still there.
-  // The profile and the provider before the redirect, then the trip there and back.
-  await expect(timeline.getByRole("listitem")).toHaveCount(5);
+  // The profile and the provider before the redirect, the trip there and
+  // back, then the exchange.
+  await expect(timeline.getByRole("listitem")).toHaveCount(6);
   await expect(timeline).not.toContainText("one-time-code-0123456789");
+
+  const [exchange] = provider.tokenRequests;
+  expect(exchange?.method()).toBe("POST");
+  expect(exchange?.headers()["dpop"]).toMatch(/^ey[\w-]+\.[\w-]+\.[\w-]+$/);
+  expect(new URLSearchParams(exchange?.postData() ?? "").get("grant_type")).toBe(
+    "authorization_code",
+  );
+});
+
+test("keeps one non-extractable DPoP key, and uses it again on the next login", async ({
+  page,
+}) => {
+  const provider = await serveAlice(page);
+  for (let login = 0; login < 2; login += 1) {
+    await discoverAlice(page);
+    await logIn(page, "Allow");
+    await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  }
+  const keys = provider.tokenRequests.map((request) => {
+    const header = (request.headers()["dpop"] ?? "").split(".")[0] ?? "";
+    return JSON.parse(Buffer.from(header, "base64url").toString()).jwk;
+  });
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toEqual(keys[0]);
+
+  const stored = await page.evaluate(
+    () =>
+      new Promise<boolean | null>((resolve) => {
+        const opening = indexedDB.open("solid-demonstrator");
+        opening.onsuccess = () => {
+          const read = opening.result.transaction("keys").objectStore("keys").get("dpop");
+          read.onsuccess = () => resolve(read.result?.privateKey?.extractable ?? null);
+        };
+      }),
+  );
+  expect(stored, "the private key can't be exported").toBe(false);
+});
+
+test("explains when the provider won't exchange the code", async ({ page }) => {
+  await serveAlice(page, { tokenStatus: 400, tokens: { error: "invalid_grant" } });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByRole("alert")).toContainText("wouldn't exchange the code");
+});
+
+test("refuses a token that isn't bound to the key", async ({ page }) => {
+  await serveAlice(page, { tokens: { token_type: "Bearer" } });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByRole("alert")).toContainText("isn't bound to the app's key");
 });
 
 test("explains when the person declines", async ({ page }) => {
@@ -117,11 +203,9 @@ test("explains when the person declines", async ({ page }) => {
 });
 
 test("refuses a response to a different login", async ({ page }) => {
-  await serveAlice(
-    page,
-    {},
-    () => new URLSearchParams({ code: "c", state: "not-the-app's", iss: issuer }),
-  );
+  await serveAlice(page, {
+    answer: () => new URLSearchParams({ code: "c", state: "not-the-app's", iss: issuer }),
+  });
   await discoverAlice(page);
   await logIn(page, "Allow");
   await expect(page.getByRole("alert")).toContainText("doesn't match the login the app started");
@@ -135,8 +219,10 @@ test("refuses a response when this tab started no login", async ({ page }) => {
 
 test("explains a provider that would need the app to register first", async ({ page }) => {
   await serveAlice(page, {
-    client_id_metadata_document_supported: false,
-    registration_endpoint: `${issuer}/register`,
+    discovery: {
+      client_id_metadata_document_supported: false,
+      registration_endpoint: `${issuer}/register`,
+    },
   });
   await discoverAlice(page);
   await expect(page.getByText(/doesn't read Client ID Documents/)).toBeVisible();

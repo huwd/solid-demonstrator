@@ -9,6 +9,7 @@
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
+import type { ExchangeProblem } from "./token-exchange.ts";
 import type { WebIdProblem } from "./webid.ts";
 
 export interface Message {
@@ -237,6 +238,44 @@ export function describeReturnProblem(problem: ReturnProblem, issuer: string): M
     case "rejected":
       return {
         summary: "The response didn't pass oauth4webapi's checks",
+        detail: problem.message,
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** Why the app couldn't get tokens for the code. */
+export function describeExchangeProblem(problem: ExchangeProblem, issuer: string): Message {
+  switch (problem.kind) {
+    case "request-failed":
+      return {
+        summary: `${issuer}'s token endpoint couldn't be reached`,
+        detail: problem.diagnosis.summary,
+      };
+    case "refused":
+      return problem.error === "invalid_grant"
+        ? {
+            summary: `${issuer} wouldn't exchange the code`,
+            detail:
+              "It said invalid_grant. A code works once, and only for a short time, so it may have expired or been used already. Log in again.",
+          }
+        : {
+            summary: `${issuer} wouldn't exchange the code`,
+            detail: `It answered ${problem.status} with ${problem.error}${problem.description === null ? "" : `: ${problem.description}`}.`,
+          };
+    case "not-dpop":
+      return {
+        summary: "The access token isn't bound to the app's key",
+        detail: `${issuer} sent a token of type ${problem.tokenType}, which anyone holding a copy could use. Solid-OIDC requires DPoP, so the app won't use it.`,
+      };
+    case "invalid-response":
+      return {
+        summary: "The tokens didn't pass oauth4webapi's checks",
         detail: problem.message,
       };
     // Unreachable while the switch covers every problem.
