@@ -7,6 +7,7 @@
  */
 
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
+import type { ReturnProblem } from "./login-return.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { WebIdProblem } from "./webid.ts";
 
@@ -197,4 +198,52 @@ export function describeProfileGaps(profile: WebIdProfile): readonly Message[] {
     });
   }
   return gaps;
+}
+
+/** Why the app won't use what the identity provider sent back. */
+export function describeReturnProblem(problem: ReturnProblem, issuer: string): Message {
+  switch (problem.kind) {
+    case "state-mismatch":
+      return {
+        summary: "The response doesn't match the login the app started",
+        detail:
+          "Its state differs from the one the app sent, so it may not be a response to this app's request. The app won't use it.",
+      };
+    case "iss-missing":
+      return {
+        summary: `${issuer} didn't say it sent the response`,
+        detail: `${issuer} says it names itself in every response, but this one has no iss, so the app can't tell where it came from.`,
+      };
+    case "iss-mismatch":
+      return {
+        summary: "The response names a different identity provider",
+        detail: `You chose ${issuer}, but the response says it's from ${problem.stated}. The app won't use a code from a provider you didn't choose.`,
+      };
+    case "refused":
+      return problem.error === "access_denied"
+        ? {
+            summary: "You didn't allow the app",
+            detail: `${issuer} says the app wasn't allowed to act for you, so nothing was shared.`,
+          }
+        : {
+            summary: `${issuer} returned an error`,
+            detail: `It said ${problem.error}${problem.description === null ? "" : `: ${problem.description}`}.`,
+          };
+    case "no-code":
+      return {
+        summary: `${issuer} sent no code`,
+        detail: "Without a code, the app can't go on to ask for tokens.",
+      };
+    case "rejected":
+      return {
+        summary: "The response didn't pass oauth4webapi's checks",
+        detail: problem.message,
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
 }
