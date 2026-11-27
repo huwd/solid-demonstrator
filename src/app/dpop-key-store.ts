@@ -57,3 +57,8 @@ function isKeyPair(value: unknown): value is CryptoKeyPair {
   const { privateKey, publicKey } = value as Record<string, unknown>;
   return privateKey instanceof CryptoKey && publicKey instanceof CryptoKey;
 }
+
+/** Removes the key pair, for logging out. A token bound to it can't be used without it. */
+export async function deleteDpopKeyPair(): Promise<void> {
+  await run("readwrite", (store) => store.delete(dpopKey));
+}

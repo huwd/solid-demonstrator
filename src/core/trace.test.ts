@@ -28,6 +28,17 @@ describe("createTrace", () => {
     );
   });
 
+  it("clears every entry, tells listeners, and numbers from 1 again", () => {
+    const trace = createTrace({ now: fixedNow, entriesMax: 10 });
+    trace.add(profileFetch);
+    const heard: number[] = [];
+    trace.subscribe((entries) => heard.push(entries.length));
+    trace.clear();
+    assert.deepEqual(trace.entries(), []);
+    assert.deepEqual(heard, [0]);
+    assert.equal(trace.add(profileFetch).id, 1);
+  });
+
   it("carries on from restored entries, numbering after them", () => {
     const before = createTrace({ now: fixedNow, entriesMax: 10 });
     before.add(profileFetch);

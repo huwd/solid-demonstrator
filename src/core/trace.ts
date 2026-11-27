@@ -91,6 +91,8 @@ export interface Trace {
   /** Records the outcome of an entry once its step has checked it. */
   settle(id: number, verdict: Verdict): TraceEntry;
   entries(): readonly TraceEntry[];
+  /** Removes every entry, for logging out. Numbering starts again from 1. */
+  clear(): void;
   /** Calls the listener after every change. Returns a function that stops it. */
   subscribe(listener: (entries: readonly TraceEntry[]) => void): () => void;
 }
@@ -145,6 +147,10 @@ export function createTrace(options: TraceOptions): Trace {
 
     entries() {
       return entries;
+    },
+
+    clear() {
+      publish([]);
     },
 
     subscribe(listener) {

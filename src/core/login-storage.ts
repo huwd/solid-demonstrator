@@ -133,3 +133,9 @@ function readRegistrations(storage: LoginStorage): Readonly<Record<string, unkno
     return {};
   }
 }
+
+/** Removes everything the app keeps in session storage, for logging out. */
+export function forgetLogins(storage: LoginStorage): void {
+  storage.removeItem(loginStorageKey);
+  storage.removeItem(registrationsStorageKey);
+}

@@ -6,6 +6,7 @@ import type { IssuerConfiguration } from "../core/issuer.ts";
 import { generateDpopKeyPair, type PendingLogin, prepareLogin } from "../core/login.ts";
 import { isLoginReturn, returnFromLogin } from "../core/login-return.ts";
 import {
+  forgetLogins,
   forgetRegistration,
   recallRegistration,
   rememberRegistration,
@@ -27,7 +28,7 @@ import { checkTokenWebId, type WebIdCheckResult } from "../core/token-webid-chec
 import { createTrace, type Trace } from "../core/trace.ts";
 import { createTracedFetch, type TracedFetch } from "../core/traced-fetch.ts";
 import type { ChooseEvent } from "./discovery-results.ts";
-import { loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
+import { deleteDpopKeyPair, loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
 import "./discovery-results.ts";
 import "./token-inspector.ts";
 import "./trace-timeline.ts";
@@ -56,6 +57,8 @@ type State =
       readonly webIdCheck: WebIdCheckResult | null;
     }
   | { readonly kind: "login-failed"; readonly message: Message }
+  /** Logged out: everything is forgotten except what's needed to explain it. */
+  | { readonly kind: "logged-out"; readonly issuer: string; readonly expiresAt: Date | null }
   /** A login response arrived, but this tab started no login. */
   | { readonly kind: "unexpected-return" };
 
@@ -270,7 +273,7 @@ export class DemonstratorApp extends LitElement {
         ${this.#renderReturn(state)}
 
         ${
-          state.kind === "idle"
+          state.kind === "idle" || state.kind === "logged-out"
             ? nothing
             : html`
               <h2>Every exchange so far</h2>
@@ -371,6 +374,24 @@ export class DemonstratorApp extends LitElement {
         </div>`;
       case "exchanging":
         return html`<p role="status">Back from ${state.issuer}. Exchanging the code for tokens…</p>`;
+      case "logged-out":
+        return html`<div class="ready" role="status">
+          <p class="summary">Logged out</p>
+          <p>
+            The app has forgotten you. The access token was only in this page's memory, and is gone.
+            ${
+              state.expiresAt === null
+                ? "It stays valid at the provider until it expires,"
+                : `It stays valid at the provider until ${state.expiresAt.toLocaleTimeString("en-GB")},`
+            }
+            but it's bound to a key the app has now deleted, so nobody can use it. The timeline, the
+            login's values in session storage and any registration have gone too.
+          </p>
+          <p>
+            You may still be logged in at ${state.issuer} itself, so logging in again may not ask for
+            your password. To end that too, log out on ${state.issuer}'s own site.
+          </p>
+        </div>`;
       case "login-failed":
         return html`<div class="problem" role="alert">
           <p class="summary">${state.message.summary}</p>
@@ -396,10 +417,31 @@ export class DemonstratorApp extends LitElement {
           .webIdCheck=${state.webIdCheck}
           .issuer=${state.inspection?.accessToken?.issuer ?? session.issuer}
           .webId=${state.inspection?.accessToken?.webId ?? session.webId}
-        ></token-inspector>`;
+        ></token-inspector>
+        <h2>Log out</h2>
+        <p>
+          Logging out makes the app forget you: the tokens, the key they're bound to, what it kept
+          for the login, and every exchange in the timeline.
+        </p>
+        <button type="button" @click=${() => this.#logOut(session)}>Log out</button>`;
       }
       default:
         return nothing;
+    }
+  }
+
+  async #logOut(session: Session): Promise<void> {
+    this.state = { kind: "logged-out", issuer: session.issuer, expiresAt: session.expiresAt };
+    this.#trace.clear();
+    try {
+      forgetLogins(sessionStorage);
+    } catch {
+      // Storage is blocked, so nothing was kept there.
+    }
+    try {
+      await deleteDpopKeyPair();
+    } catch {
+      // IndexedDB is blocked, so the key was never kept.
     }
   }
 
