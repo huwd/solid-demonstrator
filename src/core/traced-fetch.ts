@@ -29,6 +29,8 @@ export type TracedResponse =
   | {
       readonly ok: true;
       readonly entry: TraceEntry;
+      /** Where the response came from, after any redirects. */
+      readonly url: URL;
       readonly status: number;
       readonly headers: Headers;
       /** The whole body, unredacted, for the step to use. */
@@ -99,7 +101,9 @@ export function createTracedFetch(options: TracedFetchOptions): TracedFetch {
       response: received.value,
       decodedTokens: [...sent.decodedTokens, ...received.decodedTokens],
     });
-    return { ok: true, entry, status: response.status, headers: response.headers, text };
+    // A response built in code, rather than fetched, has no URL of its own.
+    const url = response.url === "" ? request.url : new URL(response.url);
+    return { ok: true, entry, url, status: response.status, headers: response.headers, text };
   };
 }
 

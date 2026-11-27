@@ -50,6 +50,9 @@ before(async () => {
       case "/not-json":
         response.writeHead(200, { "content-type": "application/problem+json" }).end("{oops");
         return;
+      case "/moved":
+        response.writeHead(301, { location: "/profile" }).end();
+        return;
       case "/empty":
         response.writeHead(204).end();
         return;
@@ -136,6 +139,26 @@ describe("createTracedFetch", () => {
       ],
     });
     assert.equal(trace.entries()[0]?.decodedTokens[0]?.label, "access token");
+  });
+
+  it("gives the step the URL the response came from, after redirects", async () => {
+    const { tracedFetch } = setUp();
+    const result = await tracedFetch({
+      describe: describeProfileFetch,
+      url: new URL(`${origin}/moved`),
+    });
+    assert.ok(result.ok);
+    assert.equal(result.url.href, `${origin}/profile`);
+    assert.equal(result.text, profileTurtle);
+  });
+
+  it("falls back to the requested URL for a response with none", async () => {
+    const builtResponse: typeof globalThis.fetch = async () => new Response("built in code");
+    const { tracedFetch } = setUp({ fetch: builtResponse });
+    const requested = new URL("https://alice.example/profile");
+    const result = await tracedFetch({ describe: describeProfileFetch, url: requested });
+    assert.ok(result.ok);
+    assert.equal(result.url.href, requested.href);
   });
 
   it("records a text request body, cutting long bodies short in the trace only", async () => {
