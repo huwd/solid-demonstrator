@@ -68,3 +68,6 @@ Editorial improvements, such as clearer wording, typo corrections and link fixes
 | [0007](0007-toolchain.md) | Use solid-oidc's toolchain, with Vale as a required check | Accepted |
 | [0008](0008-tokens-in-memory-key-in-indexeddb.md) | Keep tokens in memory, and the DPoP key as a non-extractable key in IndexedDB | Accepted |
 | [0009](0009-client-id-documents-with-registration-fallback.md) | Identify the app with a Client ID Document, falling back to dynamic registration | Accepted |
+| [0010](0010-lit-and-vite.md) | Build the interface with Lit, bundled by Vite | Accepted |
+| [0011](0011-parse-turtle-with-n3.md) | Parse profiles as Turtle with n3, and ask for Turtle only | Accepted |
+| [0012](0012-playwright-for-browser-tests.md) | Test browser behaviour with Playwright, and core logic with node:test | Accepted |

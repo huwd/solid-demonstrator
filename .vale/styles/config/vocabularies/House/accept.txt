@@ -9,12 +9,14 @@ Dependabot
 devenv
 jq
 (?i)linters?
+Lit('s)?
 (?i)lockfiles?
 (?i)loopback
 markdownlint
 Nygard('s)?
 OAuth
 pnpm
+Preact
 profile's
 (?i)rebase
 request's

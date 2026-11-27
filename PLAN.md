@@ -102,22 +102,22 @@ The tour (outcome 13) runs the real steps with a different `fetch`: one that ans
 
 ### Dependencies
 
-To be confirmed in a decision record, with each pinned exactly:
+Each is pinned exactly.
 
-| Need | Candidate |
+| Need | Choice |
 | --- | --- |
-| OAuth, PKCE and DPoP | `oauth4webapi`, which uses WebCrypto and supports DPoP and Client ID Documents |
-| Verifying the access token's signature | `jose` |
-| Parsing Turtle and JSON-LD | `n3` for Turtle; a small JSON-LD reader, or `jsonld` if needed |
-| Building the static app | Vite |
-| Interface | Plain TypeScript and DOM, or a small library such as Lit. Decide in milestone 1. |
-| Browser tests | Playwright, if the end-to-end tests below need a real browser |
+| OAuth, PKCE and DPoP | `oauth4webapi` expected ([0002](docs/decisions/0002-build-the-solid-flow-by-hand.md)), to confirm in milestone 2 |
+| Verifying the access token's signature | `jose`, to confirm in milestone 3 |
+| Parsing Turtle | `n3`, asking for Turtle only ([0011](docs/decisions/0011-parse-turtle-with-n3.md)) |
+| Building the static app | Vite ([0010](docs/decisions/0010-lit-and-vite.md)) |
+| Interface | Lit, without decorators ([0010](docs/decisions/0010-lit-and-vite.md)) |
+| Browser tests | Playwright ([0012](docs/decisions/0012-playwright-for-browser-tests.md)) |
 
 ## Testing
 
 Following solid-oidc's [decision 0010](https://github.com/huwd/solid-oidc/blob/main/docs/decisions/0010-test-against-real-implementations.md), tests run against real implementations rather than scripted stubs where they can.
 
-- **Steps and modules:** `node:test`, with full coverage. Node has WebCrypto and `fetch`, so the steps run in Node with a traced `fetch` pointed at local servers.
+- **Steps and modules:** `node:test`, with full coverage of `src/core`. Node has WebCrypto and `fetch`, so the steps run in Node with a traced `fetch` pointed at local servers.
 - **Real servers:** a Docker Compose environment with:
   - the solid-oidc broker and its sandbox, for a split stack with an upstream login
   - a Community Solid Server with its own identity provider, for a single-service stack, and for dynamic registration if it offers it; otherwise another identity provider that does
@@ -207,9 +207,7 @@ Outcome 11's export, and outcome 13.
 
 Still to record:
 
-- the low-level OAuth library and other dependencies, in milestone 1
-- the interface library, in milestone 1
-- the bundler and browser test tool, in milestone 1
+- the low-level OAuth library, in milestone 2, when login arrives
 
 ## Risks
 
