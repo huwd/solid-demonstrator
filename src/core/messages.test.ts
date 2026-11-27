@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import {
+  describeExchangeProblem,
   describeGap,
   describeIssuerProblem,
   describeProfileGaps,
@@ -12,6 +13,7 @@ import {
   type Message,
 } from "./messages.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
+import type { ExchangeProblem } from "./token-exchange.ts";
 import type { WebIdProblem } from "./webid.ts";
 
 const document = new URL("https://alice.example/profile");
@@ -156,6 +158,41 @@ describe("describeReturnProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeReturnProblem(problem, issuer);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeExchangeProblem", () => {
+  const cases: [ExchangeProblem, RegExp, RegExp][] = [
+    [
+      { kind: "request-failed", diagnosis: { kind: "unreachable", summary: "No answer." } },
+      /token endpoint couldn't be reached/,
+      /^No answer\.$/,
+    ],
+    [
+      { kind: "refused", status: 400, error: "invalid_grant", description: null },
+      /wouldn't exchange the code/,
+      /expired or been used/,
+    ],
+    [
+      { kind: "refused", status: 401, error: "invalid_client", description: "Unknown" },
+      /wouldn't exchange the code/,
+      /It answered 401 with invalid_client: Unknown\./,
+    ],
+    [
+      { kind: "refused", status: 400, error: "invalid_request", description: null },
+      /wouldn't exchange the code/,
+      /invalid_request\.$/,
+    ],
+    [{ kind: "not-dpop", tokenType: "bearer" }, /isn't bound/, /type bearer/],
+    [{ kind: "invalid-response", message: "unexpected nonce" }, /oauth4webapi/, /unexpected nonce/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeExchangeProblem(problem, issuer);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);
