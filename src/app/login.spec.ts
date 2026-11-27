@@ -649,3 +649,84 @@ test("says when the Pod links to no storage description", async ({ page }) => {
     "The Pod doesn't link to a storage description",
   );
 });
+
+test("shows a WAC Pod's access rules to someone with Control access", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      [pod]: { wacAllow: 'user="read write control",public=""', link: '<.acl>; rel="acl"' },
+      [`${pod}.acl`]: {
+        body: `@prefix acl: <http://www.w3.org/ns/auth/acl#> .
+          <#owner> a acl:Authorization ; acl:agent <${webId}> ;
+            acl:accessTo <./> ; acl:default <./> ; acl:mode acl:Read, acl:Write, acl:Control .
+          <#public> a acl:Authorization ; acl:agentClass <http://xmlns.com/foaf/0.1/Agent> ;
+            acl:origin <https://app.example> ; acl:accessTo <./> ; acl:mode acl:Read .`,
+      },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  const rules = browser.getByRole("region", { name: "Access rules" });
+  await expect(rules.getByRole("heading")).toHaveText("Access rules: Web Access Control");
+  await expect(rules).toContainText(
+    `read, write and control for ${webId}. Applies to this resource and what's inside it, by default.`,
+  );
+  await expect(rules).toContainText(
+    "read for everyone, only through apps from https://app.example. Applies to this resource.",
+  );
+});
+
+test("shows an ACP Pod's access rules to someone with Control access", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      // An ACP Pod may not send WAC-Allow, so the app offers the rules anyway.
+      [pod]: { link: '<.acr>; rel="acl"' },
+      [`${pod}.acr`]: {
+        body: `@prefix acp: <http://www.w3.org/ns/solid/acp#> .
+          @prefix acl: <http://www.w3.org/ns/auth/acl#> .
+          <> a acp:AccessControlResource ; acp:resource <./> ;
+            acp:accessControl <#owner> ; acp:memberAccessControl <#owner> .
+          <#owner> acp:apply <#ownerPolicy> .
+          <#ownerPolicy> acp:allow acl:Read, acl:Write, acl:Control ; acp:anyOf <#alice> .
+          <#alice> acp:agent <${webId}> .`,
+      },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser).toContainText("The app can't tell what you may do here");
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  const rules = browser.getByRole("region", { name: "Access rules" });
+  await expect(rules.getByRole("heading")).toHaveText("Access rules: Access Control Policies");
+  await expect(rules).toContainText(
+    `Allows read, write and control. For requests matching any of: agent ${webId}. Applies to this resource and what's inside it.`,
+  );
+});
+
+test("explains why the access rules aren't shown", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      [pod]: {
+        wacAllow: 'user="read",public=""',
+        link: '<.acl>; rel="acl"',
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ; <http://www.w3.org/ns/ldp#contains> <shared/> .`,
+      },
+      [`${pod}shared/`]: { link: '<.acl>; rel="acl"' },
+      [`${pod}shared/.acl`]: { status: 403, body: "" },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser).toContainText("You don't have Control access here");
+  await expect(browser.getByRole("button", { name: "Show the access rules" })).toHaveCount(0);
+
+  // Where the Pod doesn't say, the app asks, and explains the refusal.
+  await browser.getByRole("button", { name: "shared/" }).click();
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  await expect(browser.getByRole("alert")).toContainText(
+    "Only someone with Control access may see these rules",
+  );
+});

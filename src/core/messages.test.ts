@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { AccessRulesProblem } from "./access-rules.ts";
 import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import {
+  describeAccessRulesProblem,
   describeContainerProblem,
   describeExchangeProblem,
   describeGap,
@@ -355,6 +357,27 @@ describe("describeStorageDescriptionProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeStorageDescriptionProblem(problem, url);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeAccessRulesProblem", () => {
+  const url = new URL("https://pod.example/alice/.acl");
+  const cases: [AccessRulesProblem, RegExp, RegExp][] = [
+    [{ kind: "forbidden" }, /Control access/, /403.+separate from being able to read/],
+    [{ kind: "not-found" }, /no access rules of its own/, /nearest container/],
+    [{ kind: "unrecognised" }, /doesn't recognise/, /neither Web Access Control/],
+    [{ kind: "unparseable", message: "line 1" }, /access rules couldn't be read/, /line 1/],
+    [{ kind: "not-turtle", contentType: "text/html" }, /aren't Turtle/, /sent text\/html/],
+    [{ kind: "not-turtle", contentType: null }, /aren't Turtle/, /sent no content type/],
+    [{ kind: "http-error", status: 500 }, /returned an error/, /500/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeAccessRulesProblem(problem, url);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

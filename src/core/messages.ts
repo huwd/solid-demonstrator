@@ -6,6 +6,7 @@
  * developer who is new to Solid, in plain British English.
  */
 
+import type { AccessRulesProblem } from "./access-rules.ts";
 import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
@@ -483,6 +484,40 @@ export function describeStorageDescriptionProblem(problem: TurtleProblem, url: U
       return {
         summary: "The storage description couldn't be read",
         detail: `It isn't valid Turtle: ${problem.message}`,
+      };
+    default:
+      return describeReadProblem(problem, url);
+  }
+}
+
+/** Why a resource's access rules couldn't be shown. */
+export function describeAccessRulesProblem(problem: AccessRulesProblem, url: URL): Message {
+  switch (problem.kind) {
+    case "forbidden":
+      return {
+        summary: "Only someone with Control access may see these rules",
+        detail:
+          "The Pod answered 403. Reading a resource's access rules needs Control access to it, which is separate from being able to read the resource.",
+      };
+    case "not-found":
+      return {
+        summary: "This resource has no access rules of its own",
+        detail: `The Pod answered 404 for ${url.href}. Under Web Access Control, a resource without its own rules follows the default rules of the nearest container above it that has some.`,
+      };
+    case "unrecognised":
+      return {
+        summary: "The app doesn't recognise these rules",
+        detail: `${url.href} holds neither Web Access Control authorizations nor an Access Control Policies access control resource.`,
+      };
+    case "not-turtle":
+      return {
+        summary: "The access rules aren't Turtle",
+        detail: `${url.href} sent ${problem.contentType ?? "no content type"}, but the app asked for Turtle.`,
+      };
+    case "unparseable":
+      return {
+        summary: "The access rules couldn't be read",
+        detail: `They aren't valid Turtle: ${problem.message}`,
       };
     default:
       return describeReadProblem(problem, url);

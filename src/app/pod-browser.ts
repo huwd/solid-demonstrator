@@ -14,6 +14,7 @@ import {
   type StorageDescriptionResult,
 } from "../core/storage-description.ts";
 import type { Trace } from "../core/trace.ts";
+import "./access-rules-view.ts";
 
 /**
  * The Pod browser (outcome 5): the logged-in person's Pod, one container
@@ -201,9 +202,10 @@ export class PodBrowser extends LitElement {
     if (!result.ok) {
       return problem(describeContainerProblem(result.problem, current));
     }
-    const { contains, access } = result.container;
+    const { contains, access, links } = result.container;
     return html`
       <p>${describeAccess(access)}</p>
+      ${this.#renderRules(current, links.accessRules, access)}
       ${
         contains.length === 0
           ? html`<p>This folder is empty.</p>`
@@ -238,7 +240,7 @@ export class PodBrowser extends LitElement {
     if (!resource.ok) {
       return html`${back}${problem(describeReadProblem(resource.problem, url))}`;
     }
-    const { contentType, text, size, etag, access } = resource.resource;
+    const { contentType, text, size, etag, access, links } = resource.resource;
     return html`
       ${back}
       <h3>${nameOf(url, container)}</h3>
@@ -247,12 +249,23 @@ export class PodBrowser extends LitElement {
         ${etag === null ? "The Pod sent no ETag." : `Its ETag, this version's name, is ${etag}.`}
       </p>
       <p>${describeAccess(access)}</p>
+      ${this.#renderRules(url, links.accessRules, access)}
       ${
         text === null
           ? html`<p>The app shows only text, so it doesn't show this resource's content.</p>`
           : html`<pre tabindex="0" aria-label="Content of ${nameOf(url, container)}">${text}</pre>`
       }
     `;
+  }
+
+  #renderRules(resource: URL, rulesUrl: URL | null, access: Access | null): TemplateResult {
+    return html`<access-rules-view
+      .podFetch=${this.podFetch}
+      .trace=${this.trace}
+      .resource=${resource}
+      .rulesUrl=${rulesUrl}
+      .access=${access}
+    ></access-rules-view>`;
   }
 
   async #view(url: URL): Promise<void> {
