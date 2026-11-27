@@ -79,6 +79,7 @@ describe("discover", () => {
     const result = await discover(`${origin}/nobody#me`, { tracedFetch, trace });
     assert.ok(!result.ok);
     assert.equal(result.stage, "profile");
+    assert.equal(result.stage === "profile" ? result.document.href : "", `${origin}/nobody`);
     assert.deepEqual(result.problem, { kind: "http-error", status: 404 });
     assert.equal(trace.entries().length, 1);
   });
