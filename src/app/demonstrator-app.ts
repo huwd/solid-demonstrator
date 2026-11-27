@@ -1,15 +1,17 @@
 import { css, html, LitElement, nothing } from "lit";
+import { type Choice, choose, initialChoice } from "../core/choice.ts";
 import { type DiscoveryResult, discover } from "../core/discovery.ts";
 import { describeWebIdProblem } from "../core/messages.ts";
 import { createTrace } from "../core/trace.ts";
 import { createTracedFetch } from "../core/traced-fetch.ts";
+import type { ChooseEvent } from "./discovery-results.ts";
 import "./discovery-results.ts";
 import "./trace-timeline.ts";
 
 type State =
   | { readonly kind: "idle" }
   | { readonly kind: "running"; readonly typed: string }
-  | { readonly kind: "done"; readonly result: DiscoveryResult };
+  | { readonly kind: "done"; readonly result: DiscoveryResult; readonly choice: Choice };
 
 /**
  * The demonstrator's root element: the start page's introduction, the
@@ -126,7 +128,11 @@ export class DemonstratorApp extends LitElement {
         <p role="status">${state.kind === "running" ? `Looking up ${state.typed}…` : ""}</p>
         ${
           state.kind === "done"
-            ? html`<discovery-results .result=${state.result}></discovery-results>`
+            ? html`<discovery-results
+                .result=${state.result}
+                .choice=${state.choice}
+                @choose=${this.#choose}
+              ></discovery-results>`
             : nothing
         }
 
@@ -154,7 +160,19 @@ export class DemonstratorApp extends LitElement {
     const typed = String(new FormData(event.target as HTMLFormElement).get("webid") ?? "");
     this.state = { kind: "running", typed };
     const result = await discover(typed, { tracedFetch: this.#tracedFetch, trace: this.#trace });
-    this.state = { kind: "done", result };
+    this.state = {
+      kind: "done",
+      result,
+      choice: result.ok ? initialChoice(result) : { issuer: null, storage: null },
+    };
+  };
+
+  readonly #choose = (event: ChooseEvent): void => {
+    const state = this.state;
+    if (state.kind !== "done" || !state.result.ok) {
+      return;
+    }
+    this.state = { ...state, choice: choose(state.choice, state.result, event.detail) };
   };
 }
 
