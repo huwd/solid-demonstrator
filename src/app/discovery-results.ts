@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
+import { type Choice, choosableIssuers } from "../core/choice.ts";
 import type { DiscoveryResult, ProviderFinding } from "../core/discovery.ts";
 import {
   describeGap,
@@ -8,16 +9,25 @@ import {
   type Message,
 } from "../core/messages.ts";
 
+/** Sent when the person picks a provider or a Pod. */
+export type ChooseEvent = CustomEvent<{ readonly issuer?: string; readonly storage?: string }>;
+
 /**
  * What discovery found: the profile's statements and each identity
- * provider's readiness for login. Everything shown comes from servers the
+ * provider's readiness for login. Where the profile offers more than one
+ * usable provider or Pod, the person picks one, and a `choose` event says
+ * which (outcome 2). Everything shown comes from servers the
  * person chose, so it is only ever rendered as text, and only HTTP and
  * HTTPS addresses become links.
  */
 export class DiscoveryResults extends LitElement {
-  static override properties = { result: { attribute: false } };
+  static override properties = {
+    result: { attribute: false },
+    choice: { attribute: false },
+  };
 
   declare result: DiscoveryResult | undefined;
+  declare choice: Choice;
 
   static override styles = css`
     :host {
@@ -65,11 +75,26 @@ export class DiscoveryResults extends LitElement {
     .detail {
       margin: 0.25rem 0 0;
     }
+    fieldset {
+      border: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+    legend {
+      font-weight: bold;
+      padding: 0;
+    }
+    fieldset label {
+      display: block;
+      margin: 0.25rem 0;
+      overflow-wrap: anywhere;
+    }
   `;
 
   constructor() {
     super();
     this.result = undefined;
+    this.choice = { issuer: null, storage: null };
   }
 
   override render() {
@@ -103,14 +128,70 @@ export class DiscoveryResults extends LitElement {
       </dl>
       ${describeProfileGaps(profile).map((gap) => callout("warning", gap))}
       ${
+        profile.storages.length > 1
+          ? this.#choices(
+              "storage",
+              "Which Pod do you want to use?",
+              profile.storages.map((storage) => storage.href),
+              this.choice.storage,
+            )
+          : nothing
+      }
+      ${
         providers.length === 0
           ? nothing
           : html`
             <h2>Identity providers</h2>
             ${providers.map(renderProvider)}
+            ${
+              choosableIssuers(result).length > 1
+                ? this.#choices(
+                    "issuer",
+                    "Which identity provider do you want to log in with?",
+                    choosableIssuers(result),
+                    this.choice.issuer,
+                  )
+                : nothing
+            }
           `
       }
     `;
+  }
+
+  #choices(
+    kind: "issuer" | "storage",
+    legend: string,
+    options: readonly string[],
+    chosen: string | null,
+  ): TemplateResult {
+    return html`
+      <fieldset>
+        <legend>${legend}</legend>
+        ${options.map(
+          (option) => html`
+            <label>
+              <input
+                type="radio"
+                name=${kind}
+                .value=${option}
+                .checked=${option === chosen}
+                @change=${() => this.#choose(kind, option)}
+              />
+              ${option}
+            </label>
+          `,
+        )}
+      </fieldset>
+    `;
+  }
+
+  #choose(kind: "issuer" | "storage", value: string): void {
+    const event: ChooseEvent = new CustomEvent("choose", {
+      detail: kind === "issuer" ? { issuer: value } : { storage: value },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
   }
 }
 
