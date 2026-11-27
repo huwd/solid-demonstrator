@@ -24,6 +24,8 @@ export interface IssuerConfiguration {
    * back, so the app can check the response came from it (RFC 9207).
    */
   readonly issParameterSupported: boolean;
+  /** How the provider may sign ID tokens, as it states them; empty if it doesn't say. */
+  readonly idTokenSigningAlgs: readonly string[];
   /** Features the demonstrator's login needs that the provider doesn't say it offers. */
   readonly gaps: readonly IssuerGap[];
 }
@@ -160,6 +162,7 @@ export async function discoverIssuer(
       registrationEndpoint: registrationEndpoint as URL | null,
       clientIdDocuments,
       issParameterSupported: document["authorization_response_iss_parameter_supported"] === true,
+      idTokenSigningAlgs: strings(document["id_token_signing_alg_values_supported"]),
       gaps,
     },
   };
@@ -211,4 +214,9 @@ function parseObject(text: string): Record<string, unknown> | null {
 
 function listIncludes(list: unknown, wanted: string): boolean {
   return Array.isArray(list) && list.includes(wanted);
+}
+
+/** The strings in a discovery list, or none if it isn't a list. */
+function strings(value: unknown): readonly string[] {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 }

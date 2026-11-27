@@ -152,6 +152,7 @@ describe("discoverIssuer", () => {
     assert.ok(result.ok);
     assert.equal(result.configuration.clientIdDocuments, true);
     assert.equal(result.configuration.issParameterSupported, true);
+    assert.deepEqual(result.configuration.idTokenSigningAlgs, ["ES256"]);
     assert.equal(result.configuration.registrationEndpoint, null);
     assert.deepEqual(result.configuration.gaps, []);
     assert.equal(result.configuration.tokenEndpoint.origin, "https://id.huwdiprose.co.uk");
@@ -204,6 +205,7 @@ describe("discoverIssuer", () => {
       `${origin}/registration-only/register`,
     );
     assert.equal(result.configuration.issParameterSupported, false, "not stated, so not expected");
+    assert.deepEqual(result.configuration.idTokenSigningAlgs, []);
     assert.deepEqual(result.configuration.gaps, []);
   });
 
