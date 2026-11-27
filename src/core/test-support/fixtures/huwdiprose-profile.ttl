@@ -1,0 +1,29 @@
+# Recorded fixture: the public WebID profile of https://huwdiprose.co.uk/profile#me,
+# fetched with "Accept: text/turtle" on 2026-11-27. A real profile whose
+# identity provider and Pod are separate services (see OUTCOMES.md).
+
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix pim: <http://www.w3.org/ns/pim/space#> .
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+
+# WebID profile document for Huw Diprose.
+# Generated from src/_data/webid.yml - edit that, not this output.
+
+<https://huwdiprose.co.uk/profile>
+    a foaf:PersonalProfileDocument ;
+    foaf:maker <https://huwdiprose.co.uk/profile#me> ;
+    foaf:primaryTopic <https://huwdiprose.co.uk/profile#me> .
+
+<https://huwdiprose.co.uk/profile#me>
+    a foaf:Person, foaf:Agent ;
+    foaf:name "Huw Diprose" ;
+    foaf:homepage <https://huwdiprose.co.uk/> ;
+    foaf:img <https://huwdiprose.co.uk/favicon.png> ;
+    solid:oidcIssuer <https://id.huwdiprose.co.uk> ;
+    pim:storage <https://pod.huwdiprose.co.uk/> ;
+    pim:preferencesFile <https://pod.huwdiprose.co.uk/settings/prefs.ttl> ;
+    foaf:account <https://bsky.app/profile/huwdiprose.bsky.social> ;
+    foaf:account <https://x.com/huwdiprose> ;
+    foaf:account <https://github.com/huwd> ;
+    foaf:account <https://keybase.io/huwdiprose> ;
+    foaf:isPrimaryTopicOf <https://huwdiprose.co.uk/profile> .
