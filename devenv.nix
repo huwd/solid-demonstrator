@@ -14,6 +14,8 @@
 
   packages = [
     pkgs.actionlint
+    # For .github/rulesets/apply.sh.
+    pkgs.jq
     pkgs.shellcheck
     # Keep in step with the zizmor version in .github/workflows/ci.yml.
     pkgs.zizmor

@@ -15,7 +15,9 @@ Nygard('s)?
 OAuth
 pnpm
 profile's
+(?i)rebase
 request's
+(?i)rulesets?
 shellcheck
 token's
 (?i)toolchains?
