@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "lit": "3.3.3",
-    "n3": "2.13.12"
+    "n3": "2.13.12",
+    "oauth4webapi": "3.8.9"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",
