@@ -10,12 +10,26 @@
     "node": ">=26.13.1"
   },
   "scripts": {
-    "check": "pnpm run docs:lint && pnpm run docs:prose",
+    "build": "vite build",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run docs:lint && pnpm run docs:prose",
+    "dev": "vite",
     "docs:lint": "markdownlint-cli2",
     "docs:prose": "git ls-files -z --cached --others --exclude-standard '*.md' | xargs --null vale",
+    "format": "biome check --write .",
+    "lint": "biome ci .",
+    "preview": "vite preview",
+    "test": "node --test --experimental-test-coverage --test-coverage-include='src/core/**/*.ts' --test-coverage-include-all --test-coverage-exclude='src/**/*.test.ts' --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 'src/core/**/*.test.ts'",
+    "typecheck": "tsc",
     "workflows:audit": "zizmor --offline ."
   },
+  "dependencies": {
+    "lit": "3.3.3"
+  },
   "devDependencies": {
-    "markdownlint-cli2": "0.24.2"
+    "@biomejs/biome": "2.6.9",
+    "@types/node": "26.6.10",
+    "markdownlint-cli2": "0.24.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
   }
 }
