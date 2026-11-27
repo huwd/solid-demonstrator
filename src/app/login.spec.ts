@@ -374,7 +374,9 @@ test("shows what the tokens say, and repeats the Pod's check of the WebID", asyn
   await expect(inspector.getByRole("heading", { name: "ID token" })).toBeVisible();
   await expect(inspector.getByText(`${baseURL}/clientid.jsonld`).first()).toBeVisible();
   await expect(inspector.getByText(webId).first()).toBeVisible();
-  await expect(inspector).not.toContainText("eyJ");
+  // No JWT: a header and claims, each base64url JSON. A bare "eyJ" can turn up
+  // by chance, where a label meets a random key thumbprint.
+  await expect(inspector).not.toContainText(/eyJ[\w-]+\.eyJ[\w-]+/);
 });
 
 test("warns when the WebID's profile doesn't name the provider", async ({ page }) => {
