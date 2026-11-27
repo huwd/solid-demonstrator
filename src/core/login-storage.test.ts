@@ -41,10 +41,20 @@ const pending: PendingLogin = {
 };
 
 describe("saveLogin and takeLogin", () => {
+  it("keeps no Pod when the profile named none", () => {
+    const storage = memoryStorage();
+    saveLogin(storage, { pending, entries: [], storage: null });
+    assert.equal(takeLogin(storage)?.storage, null);
+  });
+
   it("gives back what was saved, once", () => {
     const storage = memoryStorage();
-    saveLogin(storage, { pending, entries: [] });
-    assert.deepEqual(takeLogin(storage), { pending, entries: [] });
+    saveLogin(storage, { pending, entries: [], storage: "https://pod.example/alice/" });
+    assert.deepEqual(takeLogin(storage), {
+      pending,
+      entries: [],
+      storage: "https://pod.example/alice/",
+    });
     assert.equal(storage.items.size, 0, "the secrets are removed when read");
     assert.equal(takeLogin(storage), null);
   });
@@ -60,6 +70,8 @@ describe("saveLogin and takeLogin", () => {
       JSON.stringify({ pending: { ...pending, issParameterSupported: "yes" }, entries: [] }),
       JSON.stringify({ pending: { ...pending, idTokenSigningAlgs: "ES256" }, entries: [] }),
       JSON.stringify({ pending: { ...pending, idTokenSigningAlgs: [256] }, entries: [] }),
+      JSON.stringify({ pending, entries: [] }),
+      JSON.stringify({ pending, entries: [], storage: 7 }),
     ]) {
       const storage = memoryStorage();
       storage.setItem(loginStorageKey, text);
@@ -106,7 +118,7 @@ describe("registrations", () => {
 describe("forgetLogins", () => {
   it("removes the pending login and every registration", () => {
     const storage = memoryStorage();
-    saveLogin(storage, { pending, entries: [] });
+    saveLogin(storage, { pending, entries: [], storage: "https://pod.example/alice/" });
     rememberRegistration(storage, "https://id.example", "https://app.example/", "client-a");
     storage.setItem("someone-elses", "kept");
     forgetLogins(storage);
