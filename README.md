@@ -27,7 +27,7 @@ If it's your WebID, you can then log in through your identity provider. The demo
 
 You can also change your Pod: create files and folders, edit text, and delete. The demonstrator writes in a `solid-demonstrator/` folder of its own unless you allow changes elsewhere, and asks before every delete. Each edit names the version you opened, so the Pod refuses it if someone else changed the file first. The page also shows example rules for limiting the demonstrator to that folder, for you to apply in your Pod.
 
-Notifications come in a later milestone.
+You can also watch a folder or file for changes. The demonstrator finds the Pod's notification service from its storage description, subscribes, and lists each notification as it arrives, whether the change came from this tab, another tab or another app.
 
 ### What happens to your data
 
@@ -43,7 +43,7 @@ Your browser only lets the demonstrator read a server's response if the server a
 
 ## Status
 
-Discovery, login, reading and writing the Pod, milestones 1 to 4, are complete. Notifications, milestone 5, are next. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
+Discovery, login, reading and writing the Pod, and notifications, milestones 1 to 5, are complete. Seeing the journey, milestone 6, is next. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
 
 - [`OUTCOMES.md`](OUTCOMES.md) sets out what the demonstrator must let people do and understand.
 - [`PLAN.md`](PLAN.md) describes how to build it, in milestones.

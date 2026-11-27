@@ -11,6 +11,9 @@
  * - authorisation codes, PKCE values and `state` are shortened
  * - DPoP proofs are shown in full, since each is single-use and bound to one
  *   request
+ * - a notification channel's `receiveFrom` and `id` are capability URLs:
+ *   anyone holding one can listen to the channel, so their last part and
+ *   any query are shortened
  *
  * A new kind of credential needs a rule here before any step records it.
  */
@@ -196,12 +199,45 @@ function redactJson(value: unknown, tokens: DecodedToken[], depth: number): unkn
   if (Array.isArray(value)) {
     return value.map((item) => redactJson(item, tokens, depth + 1));
   }
+  // A notification channel, which a subscription returns (Solid Notifications Protocol).
+  const isChannel = "receiveFrom" in value;
   return Object.fromEntries(
     Object.entries(value).map(([name, field]) => [
       name,
-      typeof field === "string"
-        ? redactValue(name, field, tokens)
-        : redactJson(field, tokens, depth + 1),
+      typeof field !== "string"
+        ? redactJson(field, tokens, depth + 1)
+        : isChannel && (name === "receiveFrom" || name === "id")
+          ? redactCapabilityUrl(field)
+          : redactValue(name, field, tokens),
     ]),
   );
+}
+
+/**
+ * A capability URL with its secret part shortened: every query value if it
+ * has a query, or else the last part of its path. Enough is left to see
+ * where it points.
+ */
+export function redactCapabilityUrl(href: string): string {
+  const url = URL.parse(href);
+  if (url === null) {
+    return shorten(href);
+  }
+  const base = `${url.protocol}//${url.host}`;
+  if (url.search !== "") {
+    const query = [...url.searchParams].map(([name, value]) => `${name}=${shorten(value)}`);
+    return `${base}${url.pathname}?${query.join("&")}`;
+  }
+  const segments = url.pathname.split("/");
+  const last = segments.findLastIndex((segment) => segment !== "");
+  if (last !== -1) {
+    segments[last] = shorten(segments[last] as string);
+  }
+  return `${base}${segments.join("/")}`;
+}
+
+/** A message received over a connection, such as a notification. */
+export function redactMessage(body: RecordedBody): Redacted<RecordedBody> {
+  const tokens: DecodedToken[] = [];
+  return { value: redactBody(body, tokens), decodedTokens: tokens };
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
-import { redactRequest, redactResponse } from "./redaction.ts";
+import { redactCapabilityUrl, redactMessage, redactRequest, redactResponse } from "./redaction.ts";
 import { signatureOf, signTestJwt } from "./test-support/tokens.ts";
 import type { RecordedRequest, RecordedResponse } from "./trace.ts";
 
@@ -247,5 +247,61 @@ describe("redactRequest", () => {
     assert.equal(value.method, "PUT");
     assert.deepEqual(value.headers, [["content-type", "text/turtle"]]);
     assert.deepEqual(decodedTokens, []);
+  });
+});
+
+describe("redactResponse, for a notification channel", () => {
+  const secret = "0f8e2c4a-6b1d-4e9f-a3c7-5d2b8e1f0a6c";
+  const response: RecordedResponse = {
+    status: 200,
+    statusText: "OK",
+    headers: [["content-type", "application/ld+json"]],
+    body: {
+      kind: "json",
+      value: {
+        "@context": ["https://www.w3.org/ns/solid/notification/v1"],
+        id: `https://pod.example/.notifications/WebSocketChannel2023/${secret}`,
+        type: "http://www.w3.org/ns/solid/notifications#WebSocketChannel2023",
+        topic: "https://pod.example/alice/",
+        receiveFrom: `wss://pod.example/.notifications/WebSocketChannel2023/?auth=${encodeURIComponent(`https://pod.example/.notifications/WebSocketChannel2023/${secret}`)}`,
+      },
+    },
+  };
+
+  it("shortens the capability URLs, leaving where they point", () => {
+    const shown = JSON.stringify(redactResponse(response).value);
+    assert.ok(!shown.includes(secret), shown);
+    const value = (redactResponse(response).value.body as { value: Record<string, string> }).value;
+    assert.match(
+      value["id"] ?? "",
+      /^https:\/\/pod\.example\/\.notifications\/WebSocketChannel2023\/0f8e2c… \(36 characters\)$/,
+    );
+    assert.match(
+      value["receiveFrom"] ?? "",
+      /^wss:\/\/pod\.example\/\.notifications\/WebSocketChannel2023\/\?auth=https:… \(\d+ characters\)$/,
+    );
+    assert.equal(value["topic"], "https://pod.example/alice/");
+  });
+
+  it("leaves an id alone outside a channel", () => {
+    const body = { kind: "json", value: { id: "https://pod.example/x" } } as const;
+    assert.deepEqual(redactResponse({ ...response, body }).value.body, body);
+  });
+});
+
+describe("redactCapabilityUrl", () => {
+  it("shortens a path with nothing after the origin, or something that isn't a URL", () => {
+    assert.equal(redactCapabilityUrl("wss://pod.example/"), "wss://pod.example/");
+    assert.equal(redactCapabilityUrl("not a url at all"), "not a … (16 characters)");
+  });
+});
+
+describe("redactMessage", () => {
+  it("redacts a message as it would a body", () => {
+    const message = {
+      kind: "json",
+      value: { type: "Update", object: "https://pod.example/alice/a" },
+    } as const;
+    assert.deepEqual(redactMessage(message), { value: message, decodedTokens: [] });
   });
 });

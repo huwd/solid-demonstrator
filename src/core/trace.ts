@@ -70,6 +70,8 @@ export interface EntryInput {
   readonly provenance: Provenance;
   readonly request?: RecordedRequest;
   readonly response?: RecordedResponse;
+  /** A message received over a connection, such as a notification over a WebSocket. */
+  readonly message?: RecordedBody;
   readonly decodedTokens?: readonly DecodedToken[];
   /** What a reader should take from the entry. */
   readonly explanation?: string;
