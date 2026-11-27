@@ -16,7 +16,12 @@ export interface WebIdProfile {
   readonly webId: URL;
   /** The document the profile was read from, after any redirects. */
   readonly document: URL;
-  readonly issuers: readonly URL[];
+  /**
+   * Identity providers, exactly as the profile writes them. They stay
+   * strings because issuers are compared character for character: `URL`
+   * would add a trailing slash to `https://id.example`.
+   */
+  readonly issuers: readonly string[];
   readonly storages: readonly URL[];
   readonly name: string | null;
 }
@@ -122,20 +127,20 @@ export async function fetchWebIdProfile(
       webId: input.webId,
       document: response.url,
       issuers: namedObjects(aboutWebId, vocabulary.oidcIssuer),
-      storages: namedObjects(aboutWebId, vocabulary.storage),
+      storages: namedObjects(aboutWebId, vocabulary.storage).map((iri) => new URL(iri)),
       name: aboutWebId.find((quad) => isLiteralOf(quad, vocabulary.name))?.object.value ?? null,
     },
   };
 }
 
 /** The distinct IRIs a predicate points to. Literals and blank nodes are skipped. */
-function namedObjects(quads: readonly Quad[], predicate: string): URL[] {
+function namedObjects(quads: readonly Quad[], predicate: string): string[] {
   const iris = new Set(
     quads
       .filter((quad) => quad.predicate.value === predicate && quad.object.termType === "NamedNode")
       .map((quad) => quad.object.value),
   );
-  return [...iris].map((iri) => new URL(iri));
+  return [...iris];
 }
 
 function isLiteralOf(quad: Quad, predicate: string): boolean {

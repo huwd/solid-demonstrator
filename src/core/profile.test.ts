@@ -105,10 +105,7 @@ describe("fetchWebIdProfile", () => {
     };
     const result = await fetchWebIdProfile(tracedFetch, input, trace);
     assert.ok(result.ok, "the real profile is read");
-    assert.deepEqual(
-      result.profile.issuers.map((issuer) => issuer.href),
-      ["https://id.huwdiprose.co.uk/"],
-    );
+    assert.deepEqual(result.profile.issuers, ["https://id.huwdiprose.co.uk"]);
     assert.deepEqual(
       result.profile.storages.map((storage) => storage.href),
       ["https://pod.huwdiprose.co.uk/"],
@@ -132,9 +129,9 @@ describe("fetchWebIdProfile", () => {
     const result = await fetchWebIdProfile(tracedFetch, webIdAt("/several"), trace);
     assert.ok(result.ok);
     assert.deepEqual(
-      result.profile.issuers.map((issuer) => issuer.href),
-      ["https://id-one.example/", "https://id-two.example/"],
-      "duplicates, literals and other subjects' statements are left out",
+      result.profile.issuers,
+      ["https://id-one.example", "https://id-two.example/"],
+      "kept exactly as written; duplicates, literals and other subjects' statements are left out",
     );
     assert.deepEqual(
       result.profile.storages.map((storage) => storage.href),
