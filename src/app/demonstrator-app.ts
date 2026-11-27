@@ -22,6 +22,7 @@ import {
   type Message,
 } from "../core/messages.ts";
 import { createPodFetch, type PodFetch } from "../core/pod-fetch.ts";
+import { checkPodTrust, type PodTrustResult } from "../core/pod-trust-check.ts";
 import { recordReusedRegistration, registerClient } from "../core/registration.ts";
 import { exchangeCode, type Session } from "../core/token-exchange.ts";
 import { type Inspection, inspectSession } from "../core/token-inspection.ts";
@@ -57,6 +58,8 @@ type State =
       readonly inspection: Inspection | null;
       /** Null while the Pod's check is being repeated. */
       readonly webIdCheck: WebIdCheckResult | null;
+      /** The repeat of the Pod's checks of the token and proof; null while it runs. */
+      readonly podTrust: PodTrustResult | "no-pod" | null;
       /** Makes requests to the Pod as this person, with a fresh DPoP proof each time. */
       readonly podFetch: PodFetch;
       /** The Pod chosen before login; null if the profile named none. */
@@ -220,9 +223,9 @@ export class DemonstratorApp extends LitElement {
       podFetch: createPodFetch(this.#tracedFetch, session, this.#trace),
       storage,
     } as const;
-    this.state = { ...loggedIn, inspection: null, webIdCheck: null };
+    this.state = { ...loggedIn, inspection: null, webIdCheck: null, podTrust: null };
     const inspection = await inspectSession(session);
-    this.state = { ...loggedIn, inspection, webIdCheck: null };
+    this.state = { ...loggedIn, inspection, webIdCheck: null, podTrust: null };
     // The Pod reads the access token, so the check uses what it says, where it can be read.
     const webIdCheck = await checkTokenWebId(
       this.#tracedFetch,
@@ -232,7 +235,17 @@ export class DemonstratorApp extends LitElement {
       },
       this.#trace,
     );
-    this.state = { ...loggedIn, inspection, webIdCheck };
+    this.state = { ...loggedIn, inspection, webIdCheck, podTrust: null };
+    const podTrust =
+      storage === null
+        ? "no-pod"
+        : await checkPodTrust(
+            this.#tracedFetch,
+            { ...session, issuer: inspection.accessToken?.issuer ?? session.issuer },
+            storage,
+            this.#trace,
+          );
+    this.state = { ...loggedIn, inspection, webIdCheck, podTrust };
   }
 
   override render() {
@@ -431,6 +444,7 @@ export class DemonstratorApp extends LitElement {
         <token-inspector
           .inspection=${state.inspection}
           .webIdCheck=${state.webIdCheck}
+          .podTrust=${state.podTrust}
           .issuer=${state.inspection?.accessToken?.issuer ?? session.issuer}
           .webId=${state.inspection?.accessToken?.webId ?? session.webId}
         ></token-inspector>

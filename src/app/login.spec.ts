@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
-import { signTestJwt } from "../core/test-support/tokens.ts";
+import { signTestJwt, testJwks } from "../core/test-support/tokens.ts";
 
 // A fictional person and identity provider, answered by Playwright inside
 // the browser (decisions 0003 and 0015). The provider's login page is a
@@ -36,11 +36,16 @@ interface Options {
       readonly wacAllow?: string;
       readonly contentType?: string;
       readonly etag?: string;
+      /** The Link header; by default, the storage description's, and the root's type. */
+      readonly link?: string;
     }
   >;
+  /** The storage description, as Turtle; by default, one WebSocket subscription service. */
+  readonly storageDescription?: string;
 }
 
 const pod = "https://pod.example/alice/";
+const storageDescription = "https://pod.example/.well-known/solid";
 const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> ;
   <http://www.w3.org/ns/pim/space#storage> <${pod}> .`;
 
@@ -89,6 +94,9 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       },
     }),
   );
+  await page.route(`${issuer}/jwks`, async (route) =>
+    route.fulfill({ headers: cors, json: await testJwks() }),
+  );
   await page.route(`${issuer}/auth?*`, (route) => {
     const request = new URL(route.request().url());
     authorization = request;
@@ -111,6 +119,8 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
     const body = {
       access_token: await signTestJwt({
         webid: webId,
+        sub: webId,
+        jti: crypto.randomUUID(),
         aud: "solid",
         client_id: sent?.get("client_id"),
         exp: now + 300,
@@ -144,8 +154,16 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       headers: {
         ...cors,
         "content-type": "text/turtle",
-        // The browser hides WAC-Allow from the app unless the Pod exposes it, as real Pods do.
-        "access-control-expose-headers": "WAC-Allow, ETag",
+        // The browser hides these from the app unless the Pod exposes them, as real Pods do.
+        "access-control-expose-headers": "WAC-Allow, ETag, Link",
+        link:
+          answer.link ??
+          [
+            `<${storageDescription}>; rel="http://www.w3.org/ns/solid/terms#storageDescription"`,
+            ...(request.url() === pod
+              ? ['<http://www.w3.org/ns/pim/space#Storage>; rel="type"']
+              : []),
+          ].join(", "),
         ...(answer.contentType === undefined ? {} : { "content-type": answer.contentType }),
         ...(answer.etag === undefined ? {} : { etag: answer.etag }),
         ...(answer.wacAllow === undefined ? {} : { "wac-allow": answer.wacAllow }),
@@ -153,6 +171,16 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       body: answer.body ?? "<> a <http://www.w3.org/ns/ldp#BasicContainer> .",
     });
   });
+  await page.route(storageDescription, (route) =>
+    route.fulfill({
+      headers: { ...cors, "content-type": "text/turtle" },
+      body:
+        options.storageDescription ??
+        `@prefix notify: <http://www.w3.org/ns/solid/notifications#> .
+        <> notify:subscription </.notifications/WebSocketChannel2023/> .
+        </.notifications/WebSocketChannel2023/> notify:channelType notify:WebSocketChannel2023 .`,
+    }),
+  );
   return { authorization: () => authorization, tokenRequests, podRequests };
 }
 
@@ -199,9 +227,14 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
-  // back, the exchange, the profile again and the Pod's check, then the Pod.
-  await expect(timeline.getByRole("listitem")).toHaveCount(9);
-  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(1);
+  // back, the exchange, the profile again and the WebID check, the
+  // provider's configuration and keys and the token check, then the Pod's
+  // root and its storage description.
+  await expect(timeline.getByRole("listitem")).toHaveCount(13);
+  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(2);
+  await expect(page.locator("token-inspector")).toContainText(
+    "The token and proof pass the Pod's checks",
+  );
   await expect(timeline).not.toContainText("one-time-code-0123456789");
 
   const [exchange] = provider.tokenRequests;
@@ -432,14 +465,46 @@ test("warns when the WebID's profile doesn't name the provider", async ({ page }
 test("warns when the access token is bound to another key", async ({ page }) => {
   await serveAlice(page, {
     tokens: {
-      access_token: await signTestJwt({ webid: webId, cnf: { jkt: "someone-elses-key" } }),
+      access_token: await signTestJwt({
+        webid: webId,
+        sub: webId,
+        jti: "token-1",
+        aud: "solid",
+        client_id: "https://app.example/id",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        cnf: { jkt: "someone-elses-key" },
+      }),
     },
   });
   await discoverAlice(page);
   await logIn(page, "Allow");
-  await expect(page.locator("token-inspector").getByRole("alert")).toContainText(
-    "bound to a different key",
+  const alerts = page.locator("token-inspector").getByRole("alert");
+  await expect(alerts.filter({ hasText: "bound to a different key" })).toBeVisible();
+  // Repeating the Pod's checks finds the same fault.
+  await expect(alerts.filter({ hasText: "A Pod would refuse this token" })).toContainText(
+    "confirmation mismatch",
   );
+});
+
+test("says when only RFC 9068, not Solid, would refuse the token", async ({ page }) => {
+  await serveAlice(page, {
+    tokens: {
+      access_token: await signTestJwt({
+        webid: webId,
+        aud: "solid",
+        client_id: "https://app.example/id",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        cnf: { jkt: "any" },
+      }),
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const inspector = page.locator("token-inspector");
+  await expect(
+    inspector.getByText("The token doesn't meet RFC 9068, but Solid doesn't require that"),
+  ).toBeVisible();
+  await expect(inspector).toContainText("the signature and the DPoP proof weren't checked");
 });
 
 test("logs out, forgetting the session, key, stored values and timeline", async ({ page }) => {
@@ -501,6 +566,11 @@ test("browses the Pod as the logged-in person, a folder at a time", async ({ pag
 
   const browser = page.locator("pod-browser");
   await expect(browser.getByRole("heading", { name: "Your Pod" })).toBeVisible();
+  const offers = browser.getByRole("region", { name: "What this Pod offers" });
+  await expect(offers).toContainText(`The Pod describes its storage at ${storageDescription}.`);
+  await expect(offers).toContainText(
+    "https://pod.example/.notifications/WebSocketChannel2023/: WebSocketChannel2023",
+  );
   await expect(
     browser.getByText("Here you may: read, write, append, control. Everyone may: read."),
   ).toBeVisible();
@@ -569,4 +639,94 @@ test("opens a file in the Pod, showing text as text", async ({ page }) => {
     return JSON.parse(Buffer.from(payload, "base64url").toString()).htu;
   });
   expect(proofs).toEqual([pod, `${pod}hello.txt`, `${pod}cat.png`, `${pod}secret.txt`]);
+});
+
+test("says when the Pod links to no storage description", async ({ page }) => {
+  await serveAlice(page, { pod: { [pod]: { link: "" } } });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.locator("pod-browser")).toContainText(
+    "The Pod doesn't link to a storage description",
+  );
+});
+
+test("shows a WAC Pod's access rules to someone with Control access", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      [pod]: { wacAllow: 'user="read write control",public=""', link: '<.acl>; rel="acl"' },
+      [`${pod}.acl`]: {
+        body: `@prefix acl: <http://www.w3.org/ns/auth/acl#> .
+          <#owner> a acl:Authorization ; acl:agent <${webId}> ;
+            acl:accessTo <./> ; acl:default <./> ; acl:mode acl:Read, acl:Write, acl:Control .
+          <#public> a acl:Authorization ; acl:agentClass <http://xmlns.com/foaf/0.1/Agent> ;
+            acl:origin <https://app.example> ; acl:accessTo <./> ; acl:mode acl:Read .`,
+      },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  const rules = browser.getByRole("region", { name: "Access rules" });
+  await expect(rules.getByRole("heading")).toHaveText("Access rules: Web Access Control");
+  await expect(rules).toContainText(
+    `read, write and control for ${webId}. Applies to this resource and what's inside it, by default.`,
+  );
+  await expect(rules).toContainText(
+    "read for everyone, only through apps from https://app.example. Applies to this resource.",
+  );
+});
+
+test("shows an ACP Pod's access rules to someone with Control access", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      // An ACP Pod may not send WAC-Allow, so the app offers the rules anyway.
+      [pod]: { link: '<.acr>; rel="acl"' },
+      [`${pod}.acr`]: {
+        body: `@prefix acp: <http://www.w3.org/ns/solid/acp#> .
+          @prefix acl: <http://www.w3.org/ns/auth/acl#> .
+          <> a acp:AccessControlResource ; acp:resource <./> ;
+            acp:accessControl <#owner> ; acp:memberAccessControl <#owner> .
+          <#owner> acp:apply <#ownerPolicy> .
+          <#ownerPolicy> acp:allow acl:Read, acl:Write, acl:Control ; acp:anyOf <#alice> .
+          <#alice> acp:agent <${webId}> .`,
+      },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser).toContainText("The app can't tell what you may do here");
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  const rules = browser.getByRole("region", { name: "Access rules" });
+  await expect(rules.getByRole("heading")).toHaveText("Access rules: Access Control Policies");
+  await expect(rules).toContainText(
+    `Allows read, write and control. For requests matching any of: agent ${webId}. Applies to this resource and what's inside it.`,
+  );
+});
+
+test("explains why the access rules aren't shown", async ({ page }) => {
+  await serveAlice(page, {
+    pod: {
+      [pod]: {
+        wacAllow: 'user="read",public=""',
+        link: '<.acl>; rel="acl"',
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ; <http://www.w3.org/ns/ldp#contains> <shared/> .`,
+      },
+      [`${pod}shared/`]: { link: '<.acl>; rel="acl"' },
+      [`${pod}shared/.acl`]: { status: 403, body: "" },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser).toContainText("You don't have Control access here");
+  await expect(browser.getByRole("button", { name: "Show the access rules" })).toHaveCount(0);
+
+  // Where the Pod doesn't say, the app asks, and explains the refusal.
+  await browser.getByRole("button", { name: "shared/" }).click();
+  await browser.getByRole("button", { name: "Show the access rules" }).click();
+  await expect(browser.getByRole("alert")).toContainText(
+    "Only someone with Control access may see these rules",
+  );
 });

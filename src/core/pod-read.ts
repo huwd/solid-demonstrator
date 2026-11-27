@@ -3,7 +3,9 @@
  * same for a container as for any other resource.
  */
 
-import type { Diagnosis } from "./trace.ts";
+import { Parser, type Quad } from "n3";
+import type { Diagnosis, Trace } from "./trace.ts";
+import type { TracedResponse } from "./traced-fetch.ts";
 
 export type ReadProblem =
   | { readonly kind: "request-failed"; readonly diagnosis: Diagnosis }
@@ -30,4 +32,55 @@ export function readStatusProblem(
   return status >= 200 && status <= 299
     ? null
     : { problem: { kind: "http-error", status }, actual: `${status}` };
+}
+
+export type TurtleProblem =
+  | ReadProblem
+  | { readonly kind: "not-turtle"; readonly contentType: string | null }
+  | { readonly kind: "unparseable"; readonly message: string };
+
+/**
+ * A Pod's answer read as Turtle, or why it can't be. A failure settles the
+ * entry as unexpected; a success is left for the step to settle, since
+ * only it knows whether the Turtle says what it should.
+ */
+export function readTurtle(
+  response: TracedResponse,
+  trace: Pick<Trace, "settle">,
+  expected: string,
+):
+  | { readonly ok: true; readonly response: TracedResponse & { ok: true }; readonly quads: Quad[] }
+  | { readonly ok: false; readonly problem: TurtleProblem } {
+  if (!response.ok) {
+    return { ok: false, problem: { kind: "request-failed", diagnosis: response.diagnosis } };
+  }
+  const refuse = (problem: TurtleProblem, wanted: string, actual: string) => {
+    trace.settle(response.entry.id, { kind: "unexpected", expected: wanted, actual });
+    return { ok: false, problem } as const;
+  };
+  const failed = readStatusProblem(response.status);
+  if (failed !== null) {
+    return refuse(failed.problem, expected, failed.actual);
+  }
+  const contentType = response.headers.get("content-type");
+  if (contentType === null || !/^text\/turtle\b/i.test(contentType)) {
+    return refuse(
+      { kind: "not-turtle", contentType },
+      expected,
+      `content type ${contentType ?? "none"}`,
+    );
+  }
+  try {
+    const quads = new Parser({ baseIRI: response.url.href, format: "text/turtle" }).parse(
+      response.text,
+    );
+    return { ok: true, response, quads };
+  } catch (error) {
+    const message = String(error).replace(/^Error: /, "");
+    return refuse(
+      { kind: "unparseable", message },
+      "valid Turtle",
+      `Turtle that can't be read: ${message}`,
+    );
+  }
 }

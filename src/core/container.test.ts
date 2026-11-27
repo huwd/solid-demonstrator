@@ -43,7 +43,10 @@ const listing = `@prefix ldp: <http://www.w3.org/ns/ldp#> .
 describe("readContainer", () => {
   it("lists what the container holds, with what the person may do there", async () => {
     const { trace, run } = setUp(
-      turtle(listing, { "wac-allow": 'user="read write append control",public="read"' }),
+      turtle(listing, {
+        "wac-allow": 'user="read write append control",public="read"',
+        link: '<http://www.w3.org/ns/pim/space#Storage>; rel="type", </.well-known/solid>; rel="http://www.w3.org/ns/solid/terms#storageDescription"',
+      }),
     );
     const result = await run();
     assert.ok(result.ok);
@@ -59,6 +62,8 @@ describe("readContainer", () => {
     );
     assert.deepEqual(container.contains[0]?.modified, new Date("2026-11-20T10:00:00Z"));
     assert.equal(container.contains[1]?.modified, null);
+    assert.equal(container.links.isStorage, true);
+    assert.equal(container.links.storageDescription?.href, "https://pod.example/.well-known/solid");
     assert.deepEqual(container.access, {
       user: ["read", "write", "append", "control"],
       public: ["read"],

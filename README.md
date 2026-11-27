@@ -16,7 +16,16 @@ Enter a WebID, such as `https://alice.example/profile#me`, and select **Discover
 - whether each identity provider is ready for login, and if not, why
 - a timeline of every request it made, which you can open to see what was sent and what came back
 
-If you don't have a WebID, you can use anyone's, since profiles are public. Logging in, and reading and writing a Pod, come in later milestones.
+If you don't have a WebID, you can use anyone's, since profiles are public.
+
+If it's your WebID, you can then log in through your identity provider. The demonstrator then shows:
+
+- what the tokens say, and whether a Pod would accept them, by repeating the Pod's checks
+- your Pod, a folder at a time, with what you may do in each, and the files in it
+- what your Pod offers, such as notifications, from its storage description
+- the access rules for a folder or file, if you have Control access, whether the Pod uses Web Access Control or Access Control Policies
+
+Writing to the Pod and notifications come in later milestones.
 
 ### What happens to your data
 
@@ -32,7 +41,7 @@ Your browser only lets the demonstrator read a server's response if the server a
 
 ## Status
 
-Discovery and login, milestones 1 and 2, are complete. Reading the Pod, milestone 3, is next. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
+Discovery, login and reading the Pod, milestones 1 to 3, are complete. Writing to the Pod, milestone 4, is next. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
 
 - [`OUTCOMES.md`](OUTCOMES.md) sets out what the demonstrator must let people do and understand.
 - [`PLAN.md`](PLAN.md) describes how to build it, in milestones.
