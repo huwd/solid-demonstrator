@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import {
+  describeContainerProblem,
   describeExchangeProblem,
   describeGap,
   describeIssuerProblem,
@@ -269,6 +271,37 @@ describe("describeRegistrationProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeRegistrationProblem(problem, issuer);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describeContainerProblem", () => {
+  const url = new URL("https://pod.example/alice/");
+  const cases: [ContainerProblem, RegExp, RegExp][] = [
+    [
+      { kind: "request-failed", diagnosis: { kind: "unreachable", summary: "No answer." } },
+      /couldn't be fetched/,
+      /^No answer\.$/,
+    ],
+    [{ kind: "unauthenticated" }, /didn't accept the login/, /401.+doesn't know who's asking/],
+    [{ kind: "forbidden" }, /aren't allowed/, /403.+knows who you are/],
+    [{ kind: "not-found" }, /nothing at this address/, /404/],
+    [{ kind: "http-error", status: 500 }, /returned an error/, /answered 500/],
+    [
+      { kind: "not-turtle", contentType: "text/html" },
+      /listing the app can read/,
+      /sent text\/html/,
+    ],
+    [{ kind: "not-turtle", contentType: null }, /listing the app can read/, /sent no content type/],
+    [{ kind: "unparseable", message: "line 1" }, /couldn't be read/, /line 1/],
+    [{ kind: "not-a-container" }, /isn't a container/, /nothing to list/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeContainerProblem(problem, url);
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);
