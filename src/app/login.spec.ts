@@ -30,7 +30,13 @@ interface Options {
   /** The Pod's containers, by URL, as Turtle; each defaults to an empty container. */
   readonly pod?: Record<
     string,
-    { readonly status?: number; readonly body?: string; readonly wacAllow?: string }
+    {
+      readonly status?: number;
+      readonly body?: string;
+      readonly wacAllow?: string;
+      readonly contentType?: string;
+      readonly etag?: string;
+    }
   >;
 }
 
@@ -139,7 +145,9 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
         ...cors,
         "content-type": "text/turtle",
         // The browser hides WAC-Allow from the app unless the Pod exposes it, as real Pods do.
-        "access-control-expose-headers": "WAC-Allow",
+        "access-control-expose-headers": "WAC-Allow, ETag",
+        ...(answer.contentType === undefined ? {} : { "content-type": answer.contentType }),
+        ...(answer.etag === undefined ? {} : { etag: answer.etag }),
         ...(answer.wacAllow === undefined ? {} : { "wac-allow": answer.wacAllow }),
       },
       body: answer.body ?? "<> a <http://www.w3.org/ns/ldp#BasicContainer> .",
@@ -516,4 +524,49 @@ test("browses the Pod as the logged-in person, a folder at a time", async ({ pag
   });
   expect(proofs.map((proof) => proof.htu)).toEqual([pod, `${pod}notes/`, pod, `${pod}private/`]);
   expect(new Set(proofs.map((proof) => proof.jti)).size).toBe(4);
+});
+
+test("opens a file in the Pod, showing text as text", async ({ page }) => {
+  const provider = await serveAlice(page, {
+    pod: {
+      [pod]: {
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ;
+          <http://www.w3.org/ns/ldp#contains> <hello.txt>, <cat.png>, <secret.txt> .`,
+      },
+      [`${pod}hello.txt`]: {
+        contentType: "text/plain",
+        etag: '"v1"',
+        wacAllow: 'user="read write",public=""',
+        body: "Hello <script>window.ran = true</script>",
+      },
+      [`${pod}cat.png`]: { contentType: "image/png", body: "not really a picture" },
+      [`${pod}secret.txt`]: { status: 403, body: "" },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+
+  await browser.getByRole("button", { name: "hello.txt" }).click();
+  const content = browser.getByLabel("Content of hello.txt");
+  await expect(content).toHaveText("Hello <script>window.ran = true</script>");
+  expect(await page.evaluate(() => "ran" in window)).toBe(false);
+  await expect(browser.getByText(`Its ETag, this version's name, is "v1".`)).toBeVisible();
+  await expect(
+    browser.getByText("Here you may: read, write. Everyone may: nothing."),
+  ).toBeVisible();
+
+  await browser.getByRole("button", { name: "Back to alice" }).click();
+  await browser.getByRole("button", { name: "cat.png" }).click();
+  await expect(browser.getByText(/doesn't show this resource's content/)).toBeVisible();
+
+  await browser.getByRole("button", { name: "Back to alice" }).click();
+  await browser.getByRole("button", { name: "secret.txt" }).click();
+  await expect(browser.getByRole("alert")).toContainText("You aren't allowed to read this");
+
+  const proofs = provider.podRequests.map((request) => {
+    const payload = (request.headers()["dpop"] ?? "").split(".")[1] ?? "";
+    return JSON.parse(Buffer.from(payload, "base64url").toString()).htu;
+  });
+  expect(proofs).toEqual([pod, `${pod}hello.txt`, `${pod}cat.png`, `${pod}secret.txt`]);
 });

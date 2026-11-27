@@ -9,7 +9,8 @@
 
 import { Parser, type Quad } from "n3";
 import type { PodFetch } from "./pod-fetch.ts";
-import type { Diagnosis, Trace } from "./trace.ts";
+import { type ReadProblem, readStatusProblem } from "./pod-read.ts";
+import type { Trace } from "./trace.ts";
 
 const ldp = "http://www.w3.org/ns/ldp#";
 const rdfType = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
@@ -38,11 +39,7 @@ export interface Container {
 }
 
 export type ContainerProblem =
-  | { readonly kind: "request-failed"; readonly diagnosis: Diagnosis }
-  | { readonly kind: "unauthenticated" }
-  | { readonly kind: "forbidden" }
-  | { readonly kind: "not-found" }
-  | { readonly kind: "http-error"; readonly status: number }
+  | ReadProblem
   | { readonly kind: "not-turtle"; readonly contentType: string | null }
   | { readonly kind: "unparseable"; readonly message: string }
   | { readonly kind: "not-a-container" };
@@ -78,16 +75,9 @@ export async function readContainer(
   };
   const listing = "200 with a Turtle listing of the container";
 
-  switch (response.status) {
-    case 401:
-      return refuse({ kind: "unauthenticated" }, listing, "401: the Pod didn't accept the token");
-    case 403:
-      return refuse({ kind: "forbidden" }, listing, "403: this person may not read it");
-    case 404:
-      return refuse({ kind: "not-found" }, listing, "404: there's nothing here");
-  }
-  if (response.status < 200 || response.status > 299) {
-    return refuse({ kind: "http-error", status: response.status }, listing, `${response.status}`);
+  const failed = readStatusProblem(response.status);
+  if (failed !== null) {
+    return refuse(failed.problem, listing, failed.actual);
   }
   const contentType = response.headers.get("content-type");
   if (contentType === null || !/^text\/turtle\b/i.test(contentType)) {
