@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PendingLogin } from "./login.ts";
-import { type LoginStorage, loginStorageKey, saveLogin, takeLogin } from "./login-storage.ts";
+import {
+  forgetRegistration,
+  type LoginStorage,
+  loginStorageKey,
+  recallRegistration,
+  registrationsStorageKey,
+  rememberRegistration,
+  saveLogin,
+  takeLogin,
+} from "./login-storage.ts";
 
 function memoryStorage(): LoginStorage & { readonly items: Map<string, string> } {
   const items = new Map<string, string>();
@@ -55,6 +64,40 @@ describe("saveLogin and takeLogin", () => {
       storage.setItem(loginStorageKey, text);
       assert.equal(takeLogin(storage), null, text);
       assert.equal(storage.items.size, 0, text);
+    }
+  });
+});
+
+describe("registrations", () => {
+  const issuer = "https://id.example";
+  const site = "https://app.example/";
+
+  it("remembers a client_id per issuer and redirect address, and forgets it", () => {
+    const storage = memoryStorage();
+    assert.equal(recallRegistration(storage, issuer, site), null);
+    rememberRegistration(storage, issuer, site, "client-a");
+    rememberRegistration(storage, "https://other.example", site, "client-b");
+    assert.equal(recallRegistration(storage, issuer, site), "client-a");
+    assert.equal(recallRegistration(storage, "https://other.example", site), "client-b");
+    assert.equal(recallRegistration(storage, issuer, "https://moved.example/"), null);
+
+    forgetRegistration(storage, issuer, site);
+    assert.equal(recallRegistration(storage, issuer, site), null);
+    assert.equal(recallRegistration(storage, "https://other.example", site), "client-b");
+  });
+
+  it("ignores what was stored if it isn't a set of registrations", () => {
+    for (const text of [
+      "not json",
+      "null",
+      "[]",
+      JSON.stringify({ [JSON.stringify([issuer, site])]: 7 }),
+    ]) {
+      const storage = memoryStorage();
+      storage.setItem(registrationsStorageKey, text);
+      assert.equal(recallRegistration(storage, issuer, site), null, text);
+      rememberRegistration(storage, issuer, site, "client-a");
+      assert.equal(recallRegistration(storage, issuer, site), "client-a", text);
     }
   });
 });

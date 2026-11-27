@@ -73,3 +73,63 @@ function isSavedLogin(value: unknown): value is SavedLogin {
     fields["idTokenSigningAlgs"].every((alg) => typeof alg === "string")
   );
 }
+
+/** Where registered clients are kept for the tab, by issuer and redirect address. */
+export const registrationsStorageKey = "solid-demonstrator.registrations.v1";
+
+/**
+ * The client_id the app registered with this issuer earlier in the tab,
+ * for this redirect address, or null. Kept per redirect address, since a
+ * registration is only valid for the addresses it lists.
+ */
+export function recallRegistration(
+  storage: LoginStorage,
+  issuer: string,
+  redirectUri: string,
+): string | null {
+  const clientId = readRegistrations(storage)[registrationKey(issuer, redirectUri)];
+  return typeof clientId === "string" ? clientId : null;
+}
+
+export function rememberRegistration(
+  storage: LoginStorage,
+  issuer: string,
+  redirectUri: string,
+  clientId: string,
+): void {
+  const registrations = {
+    ...readRegistrations(storage),
+    [registrationKey(issuer, redirectUri)]: clientId,
+  };
+  storage.setItem(registrationsStorageKey, JSON.stringify(registrations));
+}
+
+/** Forgets a registration, so the next login registers again. */
+export function forgetRegistration(
+  storage: LoginStorage,
+  issuer: string,
+  redirectUri: string,
+): void {
+  const { [registrationKey(issuer, redirectUri)]: _forgotten, ...rest } =
+    readRegistrations(storage);
+  storage.setItem(registrationsStorageKey, JSON.stringify(rest));
+}
+
+function registrationKey(issuer: string, redirectUri: string): string {
+  return JSON.stringify([issuer, redirectUri]);
+}
+
+function readRegistrations(storage: LoginStorage): Readonly<Record<string, unknown>> {
+  const text = storage.getItem(registrationsStorageKey);
+  if (text === null) {
+    return {};
+  }
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}

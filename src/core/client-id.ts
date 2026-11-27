@@ -11,9 +11,11 @@
 /** Where the document is published, relative to `SITE_URL`. */
 export const clientIdDocumentPath = "clientid.jsonld";
 
-export interface ClientIdDocument {
-  readonly "@context": readonly string[];
-  readonly client_id: string;
+/**
+ * What the app says about itself, the same whether it's published in the
+ * Client ID Document or sent to a registration endpoint.
+ */
+export interface ClientMetadata {
   readonly client_name: string;
   readonly client_uri: string;
   readonly redirect_uris: readonly string[];
@@ -25,12 +27,24 @@ export interface ClientIdDocument {
   readonly application_type: "web";
 }
 
+export interface ClientIdDocument extends ClientMetadata {
+  readonly "@context": readonly string[];
+  readonly client_id: string;
+}
+
 /** The Client ID Document for an app served from `siteUrl`. */
 export function clientIdDocument(siteUrl: URL): ClientIdDocument {
-  const site = siteUrl.href;
   return {
     "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
     client_id: new URL(clientIdDocumentPath, siteUrl).href,
+    ...clientMetadata(siteUrl),
+  };
+}
+
+/** The app's metadata, for an app served from `siteUrl`. */
+export function clientMetadata(siteUrl: URL): ClientMetadata {
+  const site = siteUrl.href;
+  return {
     client_name: "Solid Demonstrator",
     client_uri: site,
     // The identity provider sends the person back to the start page, which

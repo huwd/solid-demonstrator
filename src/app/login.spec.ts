@@ -238,7 +238,103 @@ test("refuses a response when this tab started no login", async ({ page }) => {
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("explains a provider that would need the app to register first", async ({ page }) => {
+test("registers first with a provider that doesn't read Client ID Documents", async ({ page }) => {
+  const registrations: unknown[] = [];
+  await page.route(`${issuer}/register`, (route) => {
+    registrations.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 201,
+      headers: cors,
+      json: { client_id: "registered-client", registration_access_token: "registration-secret" },
+    });
+  });
+  const provider = await serveAlice(page, {
+    discovery: {
+      client_id_metadata_document_supported: false,
+      registration_endpoint: `${issuer}/register`,
+    },
+  });
+  await discoverAlice(page);
+  await expect(page.getByText(/a registered name is only what the app claims/)).toBeVisible();
+
+  await logIn(page, "Allow");
+
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  expect(provider.authorization()?.searchParams.get("client_id")).toBe("registered-client");
+  expect(registrations).toEqual([
+    expect.objectContaining({
+      client_name: "Solid Demonstrator",
+      token_endpoint_auth_method: "none",
+    }),
+  ]);
+  await expect(page.locator("trace-timeline")).not.toContainText("registration-secret");
+});
+
+async function serveRegistration(page: Page): Promise<unknown[]> {
+  const registrations: unknown[] = [];
+  await page.route(`${issuer}/register`, (route) => {
+    registrations.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 201,
+      headers: cors,
+      json: { client_id: `registered-client-${registrations.length}` },
+    });
+  });
+  return registrations;
+}
+
+const registrationOnly = {
+  client_id_metadata_document_supported: false,
+  registration_endpoint: `${issuer}/register`,
+};
+
+test("registers once per provider in a tab, and says so when it uses it again", async ({
+  page,
+}) => {
+  const registrations = await serveRegistration(page);
+  const provider = await serveAlice(page, { discovery: registrationOnly });
+  for (let login = 0; login < 2; login += 1) {
+    await discoverAlice(page);
+    await logIn(page, "Allow");
+    await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  }
+  expect(registrations).toHaveLength(1);
+  expect(provider.authorization()?.searchParams.get("client_id")).toBe("registered-client-1");
+  await expect(
+    page
+      .locator("trace-timeline")
+      .getByText(/which https:\/\/id\.example gave the app earlier in this tab/),
+  ).toHaveCount(1);
+});
+
+test("registers again when the provider no longer recognises the app", async ({ page }) => {
+  const registrations = await serveRegistration(page);
+  let refuse = true;
+  await serveAlice(page, {
+    discovery: registrationOnly,
+    answer: (request) => {
+      const state = request.searchParams.get("state") ?? "";
+      const answer = refuse
+        ? { error: "unauthorized_client", state, iss: issuer }
+        : { code: "one-time-code-0123456789", state, iss: issuer };
+      refuse = false;
+      return new URLSearchParams(answer);
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByRole("alert")).toContainText("returned an error");
+
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  expect(registrations).toHaveLength(2);
+});
+
+test("explains when the provider won't register the app", async ({ page }) => {
+  await page.route(`${issuer}/register`, (route) =>
+    route.fulfill({ status: 400, headers: cors, json: { error: "invalid_client_metadata" } }),
+  );
   await serveAlice(page, {
     discovery: {
       client_id_metadata_document_supported: false,
@@ -246,8 +342,21 @@ test("explains a provider that would need the app to register first", async ({ p
     },
   });
   await discoverAlice(page);
-  await expect(page.getByText(/doesn't read Client ID Documents/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Log in/ })).toHaveCount(0);
+  await page.getByRole("button", { name: `Log in with ${issuer}` }).click();
+  await expect(page.getByRole("alert")).toContainText(`${issuer} wouldn't register the app`);
+  await expect(page.getByRole("button", { name: `Log in with ${issuer}` })).toBeEnabled();
+});
+
+test("identifies itself with its Client ID Document where the provider reads one", async ({
+  page,
+  baseURL,
+}) => {
+  await serveAlice(page);
+  await discoverAlice(page);
+  await expect(page.getByRole("link", { name: "Client ID Document" })).toHaveAttribute(
+    "href",
+    `${baseURL}/clientid.jsonld`,
+  );
 });
 
 test("shows what the tokens say, and repeats the Pod's check of the WebID", async ({
