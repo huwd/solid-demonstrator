@@ -94,7 +94,7 @@ The traced `fetch` classifies each failure:
 
 The tour (outcome 13) runs the real steps with a different `fetch`: one that answers from a recorded journey instead of the network. The steps, trace, redaction and views are the same code as a live session, so the tour can't show behaviour the live app doesn't have.
 
-- The recorded journey is captured by running the live app against the Compose environment described under [Testing](#testing), as a fictional person on fictional servers. A script captures it again whenever the steps or server versions change.
+- The recorded journey is captured by running the live app as a fictional person on fictional servers. Where it's captured from is open: [decision 0015](docs/decisions/0015-test-against-fictional-and-live-servers.md) leaves out the local stack this was planned to use. A script captures it again whenever the steps or server versions change.
 - Redaction runs on the recording before it is saved, as on any trace. The recording holds only fictional identities and test keys, so it holds nothing sensitive even before redaction.
 - The redirects to the identity provider are replaced by a short explained interlude, since there is no real login page to visit.
 - The tour includes a refusal: a second fictional WebID that the Pod refuses with `403`.
@@ -118,15 +118,11 @@ Each is pinned exactly.
 Following solid-oidc's [decision 0010](https://github.com/huwd/solid-oidc/blob/main/docs/decisions/0010-test-against-real-implementations.md), tests run against real implementations rather than scripted stubs where they can.
 
 - **Steps and modules:** `node:test`, with full coverage of `src/core`. Node has WebCrypto and `fetch`, so the steps run in Node with a traced `fetch` pointed at local servers.
-- **Real servers:** a Docker Compose environment with:
-  - the solid-oidc broker and its sandbox, for a split stack with an upstream login
-  - a Community Solid Server with its own identity provider, for a single-service stack, and for dynamic registration if it offers it; otherwise another identity provider that does
-  - a Community Solid Server with identity disabled, trusting the broker, matching the reference stack's Pod
-  - static WebID profiles covering the cases in outcome 2: one issuer, several issuers, several Pods, and none
-- **Fixtures:** recorded responses from real servers, for failures a real server won't produce on demand. Each fixture records where and when it was captured.
-- **End to end:** the full journey in a browser against the Compose environment.
+- **Browser:** Playwright, in Chromium, Firefox and WebKit, against fictional profiles, identity providers and Pods that Playwright answers. CORS is tested against a real local server, since Playwright's answers skip the browser's CORS check.
+- **Fixtures:** recorded responses from real servers, for behaviour a fictional server wouldn't show. Each fixture records where and when it was captured.
+- **Live servers:** real logins are tried by hand on the deployed site, with the broker and with a provider that offers dynamic registration, such as solidcommunity.net.
 
-Identity providers fetch the Client ID Document themselves, so a remote provider can't reach one on `localhost`. Local development therefore runs against the Compose environment, where the broker allows loopback Client ID Documents, or uses dynamic registration with identity providers that offer it, since registration needs no fetch back to the app. Whether the Community Solid Server's identity provider accepts a loopback Client ID Document needs checking in milestone 2. Live providers are tested from a deployed build.
+[Decision 0015](docs/decisions/0015-test-against-fictional-and-live-servers.md) leaves out a local stack of real servers for now. Identity providers fetch the Client ID Document themselves, and the broker fetches one only over HTTPS, so a local stack would need its own certificate authority. solid-oidc's sandbox shows how to add one later.
 
 ## Milestones
 
@@ -160,7 +156,7 @@ Outcomes 3, 4, 11 and 12.
 - Reconstructed and explained entries for the identity provider's side.
 - The token inspector, and the check that the token's WebID names this issuer.
 - Logout.
-- The Compose environment for local testing.
+- Browser tests of the whole login against fictional identity providers, and tries by hand on the deployed site.
 
 At the end, a person can log in with the broker, a Community Solid Server and a hosted provider, and see each step.
 
@@ -212,5 +208,5 @@ Still to record:
 ## Risks
 
 - **Hosted providers behave differently.** Providers differ in CORS headers, token claims and notification support. Testing against at least one hosted provider from milestone 2 onwards catches this early.
-- **Explained steps drift from reality.** An explanation of what a server does can become wrong when the server changes. Each explained entry links the specification it relies on, and the Compose environment pins the server versions it was checked against.
+- **Explained steps drift from reality.** An explanation of what a server does can become wrong when the server changes. Each explained entry links the specification it relies on. Recorded fixtures say which server, and when, they were captured from.
 - **Scope creep towards a full Pod browser.** Outcome 5 is limited to what shows the plumbing. Features beyond that need a reason tied to the outcomes.
