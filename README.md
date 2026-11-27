@@ -29,3 +29,7 @@ Documentation is written in plain British English in the GOV.UK style.
 Vale errors fail the build; add genuine project terms to `.vale/styles/config/vocabularies/House/accept.txt`.
 
 [`.github/rulesets/`](.github/rulesets/README.md) defines the branch protection for `main`, and how to apply it.
+
+## Licence
+
+[MIT](LICENSE).
