@@ -53,4 +53,4 @@ The project follows [solid-oidc](https://github.com/huwd/solid-oidc)'s conventio
   ```
 
   Use `Generated-by` when the agent produced most of the change from prompts, and `Assisted-by` when the maintainer did most of the work. Say which you chose when committing.
-- CI workflows stay read-only. Run `gh actions-lock` after changing any `uses:` line.
+- CI workflows stay read-only. The one exception is the deploy job in `deploy.yml`, which publishes `main` to GitHub Pages ([0013](docs/decisions/0013-deploy-to-github-pages.md)). Run `gh actions-lock` after changing any `uses:` line.
