@@ -20,13 +20,15 @@ If you don't have a WebID, you can use anyone's, since profiles are public. Logg
 
 ### What happens to your data
 
-The demonstrator runs entirely in your browser. It sends requests straight from your browser to the servers your WebID names, and to no one else. It keeps nothing once you close the page.
+The demonstrator runs entirely in your browser. It sends requests straight from your browser to the servers your WebID names, and to no one else.
+
+While you're at your identity provider logging in, the demonstrator keeps the one-time secrets for the login, and its timeline, in your browser's session storage, for that tab only. It removes the secrets as soon as you come back. It keeps nothing once you close the page.
 
 Your browser only lets the demonstrator read a server's response if the server allows requests from other sites, using CORS. Solid servers are expected to. If one doesn't, the demonstrator says so.
 
 ## Status
 
-Milestone 1, discovery, is nearly complete. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
+Discovery is complete, and login, milestone 2, is in progress. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
 
 - [`OUTCOMES.md`](OUTCOMES.md) sets out what the demonstrator must let people do and understand.
 - [`PLAN.md`](PLAN.md) describes how to build it, in milestones.

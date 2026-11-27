@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
+import type { ReturnProblem } from "./login-return.ts";
 import {
   describeGap,
   describeIssuerProblem,
   describeProfileGaps,
   describeProfileProblem,
+  describeReturnProblem,
   describeWebIdProblem,
   type Message,
 } from "./messages.ts";
@@ -122,4 +124,41 @@ describe("describeProfileGaps", () => {
     );
     gaps.forEach(assertReadable);
   });
+});
+
+describe("describeReturnProblem", () => {
+  const cases: [ReturnProblem, RegExp, RegExp][] = [
+    [{ kind: "state-mismatch" }, /doesn't match the login/, /won't use it/],
+    [{ kind: "iss-missing" }, /didn't say it sent/, /has no iss/],
+    [
+      { kind: "iss-mismatch", stated: "https://elsewhere.example" },
+      /different identity provider/,
+      /You chose https:\/\/id\.example, but .+elsewhere/,
+    ],
+    [
+      { kind: "refused", error: "access_denied", description: null },
+      /You didn't allow the app/,
+      /nothing was shared/,
+    ],
+    [
+      { kind: "refused", error: "server_error", description: "Try later" },
+      /returned an error/,
+      /It said server_error: Try later\./,
+    ],
+    [
+      { kind: "refused", error: "temporarily_unavailable", description: null },
+      /returned an error/,
+      /It said temporarily_unavailable\.$/,
+    ],
+    [{ kind: "no-code" }, /sent no code/, /can't go on/],
+    [{ kind: "rejected", message: "duplicate state" }, /oauth4webapi/, /duplicate state/],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describeReturnProblem(problem, issuer);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
 });
