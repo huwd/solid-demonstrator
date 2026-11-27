@@ -8,7 +8,7 @@ It is for developers who know HTTP and OAuth, and want to understand how the par
 
 ## Status
 
-Planning. The app itself hasn't been built yet.
+Early development. The app is an empty shell; discovery, the first milestone, is in progress.
 
 - [`OUTCOMES.md`](OUTCOMES.md) sets out what the demonstrator must let people do and understand.
 - [`PLAN.md`](PLAN.md) describes how to build it, in milestones.
@@ -21,7 +21,8 @@ Development uses [devenv](https://devenv.sh/) for the toolchain: Node 26, pnpm, 
 ```sh
 devenv test                  # the build: install, then run every check
 devenv shell                 # a shell with the toolchain
-pnpm run check               # markdownlint and Vale, inside devenv shell
+pnpm run check               # every check CI runs, inside devenv shell
+pnpm run dev                 # the app, served by Vite with reload
 pnpm run workflows:audit     # zizmor security audit of the workflows
 ```
 
