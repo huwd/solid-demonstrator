@@ -4,10 +4,18 @@ import {
   describeContainerProblem,
   describeReadProblem,
   describeStorageDescriptionProblem,
+  describeSubscribeProblem,
   describeWriteProblem,
   type Message,
 } from "../core/messages.ts";
 import { acpExample, wacExample } from "../core/narrowing.ts";
+import {
+  findWebSocketService,
+  listen,
+  type Notification,
+  type SubscribeProblem,
+  subscribe,
+} from "../core/notifications.ts";
 import type { PodFetch } from "../core/pod-fetch.ts";
 import {
   createResource,
@@ -49,10 +57,11 @@ export class PodBrowser extends LitElement {
     confirmingDelete: { state: true },
     writeProblem: { state: true },
     busy: { state: true },
+    watch: { state: true },
   };
 
   declare podFetch: PodFetch | null;
-  declare trace: Pick<Trace, "settle"> | null;
+  declare trace: Pick<Trace, "add" | "settle"> | null;
   /** The storage root the person chose. */
   declare root: URL | null;
   declare current: URL | null;
@@ -79,6 +88,14 @@ export class PodBrowser extends LitElement {
   declare confirmingDelete: URL | null;
   declare writeProblem: { readonly url: URL; readonly problem: WriteProblem } | null;
   declare busy: boolean;
+  /** What the app is watching for changes, and what it has heard. */
+  declare watch: {
+    readonly topic: URL;
+    readonly status: "subscribing" | "open" | "failed" | "closed";
+    readonly problem: SubscribeProblem | null;
+    readonly notifications: readonly Notification[];
+  } | null;
+  #stopWatching: (() => void) | null = null;
 
   static override styles = css`
     :host {
@@ -155,6 +172,13 @@ export class PodBrowser extends LitElement {
     this.confirmingDelete = null;
     this.writeProblem = null;
     this.busy = false;
+    this.watch = null;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.#stopWatching?.();
+    this.#stopWatching = null;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -162,6 +186,9 @@ export class PodBrowser extends LitElement {
       this.description = null;
       this.scratch = null;
       this.allowElsewhere = false;
+      this.#stopWatching?.();
+      this.#stopWatching = null;
+      this.watch = null;
       void this.#open(this.root);
     }
   }
@@ -179,6 +206,7 @@ export class PodBrowser extends LitElement {
         proof. The timeline shows every request.
       </p>
       ${this.#renderDescription()}
+      ${this.#renderNotifications(this.viewing ?? current)}
       ${this.#renderWriting(root)}
       ${this.#renderPath(root, current)}
       ${
@@ -318,6 +346,114 @@ export class PodBrowser extends LitElement {
       }
       ${this.#renderChanges(url, resource.resource.contentType, text, etag)}
     `;
+  }
+
+  #renderNotifications(here: URL): TemplateResult | typeof nothing {
+    const description = this.description;
+    if (description === null) {
+      return nothing;
+    }
+    const service =
+      description !== "none" && description.ok
+        ? findWebSocketService(description.description)
+        : null;
+    if (service === null) {
+      return html`<section aria-label="Notifications">
+        <h3>Notifications</h3>
+        <p>
+          The Pod doesn't offer notifications over a WebSocket, so the app can't watch for changes.
+          Everything else still works.
+        </p>
+      </section>`;
+    }
+    const watch = this.watch;
+    return html`<section aria-label="Notifications">
+      <h3>Notifications</h3>
+      <p>
+        The storage description names ${service.url.href} as a subscription service for
+        WebSocketChannel2023.
+      </p>
+      ${
+        watch === null || watch.topic.href !== here.href
+          ? html`<p><button @click=${() => this.#watch(service.url, here)}>Watch ${here.href}</button></p>`
+          : nothing
+      }
+      ${watch === null ? nothing : this.#renderWatch(watch, service.url)}
+    </section>`;
+  }
+
+  #renderWatch(watch: NonNullable<PodBrowser["watch"]>, service: URL): TemplateResult {
+    const status = {
+      subscribing: html`<p role="status">Subscribing to ${watch.topic.href}…</p>`,
+      open: html`<p role="status">
+        Watching ${watch.topic.href}. Change it from this tab, another tab or another app, and each
+        notification appears here and in the timeline.
+      </p>`,
+      failed:
+        watch.problem === null
+          ? problem({
+              summary: "The WebSocket didn't open",
+              detail:
+                "The app subscribed, but couldn't connect to the address the service gave. The browser doesn't say why.",
+            })
+          : problem(describeSubscribeProblem(watch.problem, service)),
+      closed: html`<p>The notification service closed the connection, so no more notifications will arrive.</p>`,
+    }[watch.status];
+    return html`
+      ${status}
+      ${
+        watch.status === "open"
+          ? html`<p><button @click=${() => this.#unwatch()}>Stop watching</button></p>`
+          : nothing
+      }
+      ${
+        watch.notifications.length === 0
+          ? nothing
+          : html`<ol aria-label="Notifications received">
+              ${watch.notifications.map(
+                (notification) => html`<li>
+                  ${notification.type} of ${notification.object ?? watch.topic.href}${
+                    notification.state === null ? "" : `, now version ${notification.state}`
+                  }${notification.published === null ? "" : `, at ${notification.published.toLocaleTimeString("en-GB")}`}
+                </li>`,
+              )}
+            </ol>`
+      }
+    `;
+  }
+
+  async #watch(service: URL, topic: URL): Promise<void> {
+    if (this.podFetch === null || this.trace === null) {
+      return;
+    }
+    this.#unwatch();
+    const trace = this.trace;
+    this.watch = { topic, status: "subscribing", problem: null, notifications: [] };
+    const result = await subscribe(this.podFetch, service, topic, trace);
+    if (this.watch?.topic !== topic) {
+      return;
+    }
+    if (!result.ok) {
+      this.watch = { ...this.watch, status: "failed", problem: result.problem };
+      return;
+    }
+    const update = (change: Partial<NonNullable<PodBrowser["watch"]>>) => {
+      if (this.watch?.topic === topic) {
+        this.watch = { ...this.watch, ...change };
+      }
+    };
+    this.#stopWatching = listen((url) => new WebSocket(url), result.channel, trace, {
+      onOpen: () => update({ status: "open" }),
+      onNotification: (notification) =>
+        update({ notifications: [notification, ...(this.watch?.notifications ?? [])] }),
+      onClose: (reason) => update({ status: reason }),
+    });
+  }
+
+  #unwatch(): void {
+    this.#stopWatching?.();
+    this.#stopWatching = null;
+    this.watch = null;
   }
 
   #canWrite(url: URL): boolean {

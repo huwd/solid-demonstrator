@@ -8,10 +8,12 @@
  * someone else would.
  */
 
-import type { Page, Request, Route } from "@playwright/test";
+import type { Page, Request, Route, WebSocketRoute } from "@playwright/test";
 
 export const pod = "https://pod.example/alice/";
 export const storageDescription = "https://pod.example/.well-known/solid";
+export const subscriptionService = "https://pod.example/.notifications/WebSocketChannel2023/";
+const listenAt = "wss://pod.example/.notifications/ws/";
 
 const cors = { "access-control-allow-origin": "*" };
 
@@ -34,6 +36,8 @@ export interface FictionalPod {
   readonly change: (url: string, body: string) => void;
   /** What the Pod holds at a URL, if anything. */
   readonly holds: (url: string) => Answer | undefined;
+  /** The subscriptions the notification service accepted, by topic. */
+  readonly subscriptions: readonly string[];
 }
 
 export async function serveFictionalPod(
@@ -45,6 +49,21 @@ export async function serveFictionalPod(
   const requests: Request[] = [];
   let version = 0;
   const nextEtag = () => `"v${++version}"`;
+  const subscriptions: string[] = [];
+  /** Each channel's topic, by the identifier in its address. */
+  const channels = new Map<string, string>();
+  const sockets: { readonly topic: string; readonly socket: WebSocketRoute }[] = [];
+
+  /** Tells whoever watches the resource, or the container holding it. */
+  const announce = (url: string, change: Change, etag: string | null) => {
+    const container = url.replace(/[^/]+\/?$/, "");
+    for (const { topic, socket } of sockets) {
+      const type = activity(topic, url, container, change);
+      if (type !== null) {
+        socket.send(JSON.stringify(notification(type, url, container, etag)));
+      }
+    }
+  };
 
   const children = (container: string) =>
     [...resources.keys()].filter((url) => {
@@ -124,6 +143,7 @@ export async function serveFictionalPod(
     }
     if (request.method() === "DELETE") {
       resources.delete(url);
+      announce(url, "Delete", null);
       return route.fulfill({ status: 204, headers: cors, body: "" });
     }
     const created = !exists(url);
@@ -140,6 +160,7 @@ export async function serveFictionalPod(
             etag,
           },
     );
+    announce(url, created ? "Create" : "Update", etag);
     return route.fulfill({
       status: created ? 201 : 205,
       headers: { ...cors, etag, "access-control-expose-headers": "ETag" },
@@ -172,12 +193,72 @@ export async function serveFictionalPod(
     }),
   );
 
+  await page.route(subscriptionService, async (route) => {
+    const request = route.request();
+    if (!request.headers()["authorization"]?.startsWith("DPoP ")) {
+      return route.fulfill({ status: 401, headers: cors, body: "" });
+    }
+    const { topic } = request.postDataJSON() as { topic: string };
+    subscriptions.push(topic);
+    const id = crypto.randomUUID();
+    channels.set(id, topic);
+    return route.fulfill({
+      headers: { ...cors, "content-type": "application/ld+json" },
+      body: JSON.stringify({
+        "@context": ["https://www.w3.org/ns/solid/notification/v1"],
+        id: `${subscriptionService}${id}`,
+        type: "http://www.w3.org/ns/solid/notifications#WebSocketChannel2023",
+        topic,
+        receiveFrom: `${listenAt}${id}`,
+      }),
+    });
+  });
+  await page.routeWebSocket(new RegExp(`^${listenAt.replace(/[.]/g, "\\.")}`), (socket) => {
+    const topic = channels.get(socket.url().slice(listenAt.length));
+    if (topic === undefined) {
+      void socket.close({ code: 4404, reason: "No such channel" });
+      return;
+    }
+    sockets.push({ topic, socket });
+  });
+
   return {
+    subscriptions,
     requests,
     change: (url, body) => {
       const current = resources.get(url) ?? {};
-      resources.set(url, { ...current, body, etag: nextEtag() });
+      const etag = nextEtag();
+      resources.set(url, { ...current, body, etag });
+      announce(url, "Update", etag);
     },
     holds: (url) => resources.get(url),
+  };
+}
+
+type Change = "Create" | "Update" | "Delete";
+
+/** What a watcher of the topic hears about a change: the change itself, or an Add or Remove for its container. */
+function activity(topic: string, url: string, container: string, change: Change): string | null {
+  if (topic === url) {
+    return change;
+  }
+  if (topic !== container || change === "Update") {
+    return null;
+  }
+  return change === "Delete" ? "Remove" : "Add";
+}
+
+function notification(type: string, url: string, container: string, etag: string | null) {
+  return {
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
+      "https://www.w3.org/ns/solid/notification/v1",
+    ],
+    id: `urn:uuid:${crypto.randomUUID()}`,
+    type,
+    object: url,
+    ...(type === "Add" || type === "Remove" ? { target: container } : {}),
+    ...(etag === null ? {} : { state: etag }),
+    published: new Date().toISOString(),
   };
 }

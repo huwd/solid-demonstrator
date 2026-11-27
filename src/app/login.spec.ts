@@ -541,7 +541,7 @@ test("browses the Pod as the logged-in person, a folder at a time", async ({ pag
   await expect(browser.getByText("Here you may: read. Everyone may: nothing.")).toBeVisible();
   await expect(browser.getByRole("navigation", { name: "Where you are" })).toContainText("notes");
 
-  await browser.getByRole("button", { name: "alice" }).click();
+  await browser.getByRole("button", { name: "alice", exact: true }).click();
   await browser.getByRole("button", { name: "private/" }).click();
   await expect(browser.getByRole("alert")).toContainText("You aren't allowed to read this");
   await expect(browser.getByRole("alert")).toContainText("knows who you are");
@@ -793,4 +793,70 @@ test("changes nothing outside the scratch folder until allowed to", async ({ pag
     `acp:client <${baseURL}/clientid.jsonld>`,
   );
   await expect(browser.getByLabel("Example WAC rules")).toContainText(`acl:origin <${baseURL}>`);
+});
+
+test("watches the scratch folder, and shows each notification as it arrives", async ({ page }) => {
+  const provider = await serveAlice(page);
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  const notifications = browser.getByRole("region", { name: "Notifications" });
+  await expect(notifications).toContainText(
+    "names https://pod.example/.notifications/WebSocketChannel2023/ as a subscription service",
+  );
+
+  await browser.getByRole("button", { name: "Use the scratch folder" }).click();
+  await notifications.getByRole("button", { name: `Watch ${scratch}` }).click();
+  await expect(notifications.getByRole("status")).toContainText(`Watching ${scratch}`);
+  expect(provider.pod.subscriptions).toEqual([scratch]);
+
+  // A change from this tab.
+  const create = browser.getByRole("form", { name: "Create" });
+  await create.getByLabel("Name").fill("note.txt");
+  await create.getByRole("button", { name: "Create" }).click();
+  const received = notifications.getByRole("list", { name: "Notifications received" });
+  await expect(received).toContainText(`Add of ${scratch}note.txt`);
+
+  // Each notification is in the timeline, with the message it came in.
+  const timeline = page.locator("trace-timeline");
+  const entry = timeline.locator('[data-step="notification"]');
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText(`A notification: Add of ${scratch}note.txt.`);
+  await expect(timeline.locator('[data-step="listen"]')).toContainText(
+    "Open the WebSocket the channel named",
+  );
+  await expect(timeline).not.toContainText("wss://pod.example/.notifications/ws/", {
+    useInnerText: true,
+  });
+});
+
+test("watches a file changed by another app", async ({ page }) => {
+  const note = `${scratch}note.txt`;
+  const provider = await serveAlice(page, {
+    pod: { [note]: { contentType: "text/plain", body: "Mine", etag: '"v0"' } },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await browser.getByRole("button", { name: "Use the scratch folder" }).click();
+  await browser.getByRole("button", { name: "note.txt" }).click();
+  const notifications = browser.getByRole("region", { name: "Notifications" });
+  await notifications.getByRole("button", { name: `Watch ${note}` }).click();
+  await expect(notifications.getByRole("status")).toContainText(`Watching ${note}`);
+
+  provider.pod.change(note, "Theirs");
+  await expect(notifications.getByRole("list", { name: "Notifications received" })).toContainText(
+    `Update of ${note}, now version "v1"`,
+  );
+});
+
+test("says when the Pod offers no notifications, and the rest still works", async ({ page }) => {
+  await serveAlice(page, { storageDescription: "<> a <http://www.w3.org/ns/pim/space#Storage> ." });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser.getByRole("region", { name: "Notifications" })).toContainText(
+    "The Pod doesn't offer notifications over a WebSocket",
+  );
+  await expect(browser.getByRole("button", { name: "Use the scratch folder" })).toBeVisible();
 });
