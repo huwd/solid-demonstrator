@@ -71,6 +71,7 @@ const shortenedNames: ReadonlySet<string> = new Set([
   "code",
   "code_challenge",
   "code_verifier",
+  "nonce",
   "state",
 ]);
 
