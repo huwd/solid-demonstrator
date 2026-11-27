@@ -21,6 +21,7 @@ import {
   describeWebIdProblem,
   type Message,
 } from "../core/messages.ts";
+import { createPodFetch, type PodFetch } from "../core/pod-fetch.ts";
 import { recordReusedRegistration, registerClient } from "../core/registration.ts";
 import { exchangeCode, type Session } from "../core/token-exchange.ts";
 import { type Inspection, inspectSession } from "../core/token-inspection.ts";
@@ -30,6 +31,7 @@ import { createTracedFetch, type TracedFetch } from "../core/traced-fetch.ts";
 import type { ChooseEvent } from "./discovery-results.ts";
 import { deleteDpopKeyPair, loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
 import "./discovery-results.ts";
+import "./pod-browser.ts";
 import "./token-inspector.ts";
 import "./trace-timeline.ts";
 
@@ -55,6 +57,10 @@ type State =
       readonly inspection: Inspection | null;
       /** Null while the Pod's check is being repeated. */
       readonly webIdCheck: WebIdCheckResult | null;
+      /** Makes requests to the Pod as this person, with a fresh DPoP proof each time. */
+      readonly podFetch: PodFetch;
+      /** The Pod chosen before login; null if the profile named none. */
+      readonly storage: URL | null;
     }
   | { readonly kind: "login-failed"; readonly message: Message }
   /** Logged out: everything is forgotten except what's needed to explain it. */
@@ -182,10 +188,14 @@ export class DemonstratorApp extends LitElement {
       return;
     }
     this.state = { kind: "exchanging", issuer: pending.issuer };
-    void this.#exchange(pending, result.parameters);
+    void this.#exchange(pending, result.parameters, URL.parse(saved.storage ?? ""));
   }
 
-  async #exchange(pending: PendingLogin, callback: URLSearchParams): Promise<void> {
+  async #exchange(
+    pending: PendingLogin,
+    callback: URLSearchParams,
+    storage: URL | null,
+  ): Promise<void> {
     const result = await exchangeCode(
       this.#tracedFetch,
       pending,
@@ -204,9 +214,15 @@ export class DemonstratorApp extends LitElement {
       return;
     }
     const { session } = result;
-    this.state = { kind: "logged-in", session, inspection: null, webIdCheck: null };
+    const loggedIn = {
+      kind: "logged-in",
+      session,
+      podFetch: createPodFetch(this.#tracedFetch, session, this.#trace),
+      storage,
+    } as const;
+    this.state = { ...loggedIn, inspection: null, webIdCheck: null };
     const inspection = await inspectSession(session);
-    this.state = { kind: "logged-in", session, inspection, webIdCheck: null };
+    this.state = { ...loggedIn, inspection, webIdCheck: null };
     // The Pod reads the access token, so the check uses what it says, where it can be read.
     const webIdCheck = await checkTokenWebId(
       this.#tracedFetch,
@@ -216,7 +232,7 @@ export class DemonstratorApp extends LitElement {
       },
       this.#trace,
     );
-    this.state = { kind: "logged-in", session, inspection, webIdCheck };
+    this.state = { ...loggedIn, inspection, webIdCheck };
   }
 
   override render() {
@@ -418,6 +434,11 @@ export class DemonstratorApp extends LitElement {
           .issuer=${state.inspection?.accessToken?.issuer ?? session.issuer}
           .webId=${state.inspection?.accessToken?.webId ?? session.webId}
         ></token-inspector>
+        <pod-browser
+          .podFetch=${state.podFetch}
+          .trace=${this.#trace}
+          .root=${state.storage}
+        ></pod-browser>
         <h2>Log out</h2>
         <p>
           Logging out makes the app forget you: the tokens, the key they're bound to, what it kept

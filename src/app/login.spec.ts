@@ -15,6 +15,8 @@ interface Provider {
   readonly authorization: () => URL | null;
   /** The token requests the provider received. */
   readonly tokenRequests: readonly Request[];
+  /** The requests the Pod accepted. */
+  readonly podRequests: readonly Request[];
 }
 
 interface Options {
@@ -25,9 +27,16 @@ interface Options {
   readonly tokenStatus?: number;
   /** The profile from the second fetch on, when the app checks the token's WebID. */
   readonly profileAfterLogin?: string;
+  /** The Pod's containers, by URL, as Turtle; each defaults to an empty container. */
+  readonly pod?: Record<
+    string,
+    { readonly status?: number; readonly body?: string; readonly wacAllow?: string }
+  >;
 }
 
-const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> .`;
+const pod = "https://pod.example/alice/";
+const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> ;
+  <http://www.w3.org/ns/pim/space#storage> <${pod}> .`;
 
 /** The RFC 7638 thumbprint of the key in a DPoP proof, as a provider binds a token to it. */
 function proofThumbprint(proof: string): string {
@@ -47,6 +56,7 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
   const answer = options.answer ?? answerWithCode;
   let authorization: URL | null = null;
   const tokenRequests: Request[] = [];
+  const podRequests: Request[] = [];
   let profileFetches = 0;
   await page.route(alice, (route) => {
     profileFetches += 1;
@@ -114,7 +124,28 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
     };
     return route.fulfill({ status: options.tokenStatus ?? 200, headers: cors, json: body });
   });
-  return { authorization: () => authorization, tokenRequests };
+  await page.route(`${pod}**`, (route) => {
+    const request = route.request();
+    const headers = request.headers();
+    // A Pod refuses a request without a DPoP-bound token and a proof.
+    if (!headers["authorization"]?.startsWith("DPoP ") || headers["dpop"] === undefined) {
+      return route.fulfill({ status: 401, headers: cors, body: "" });
+    }
+    podRequests.push(request);
+    const answer = options.pod?.[request.url()] ?? {};
+    return route.fulfill({
+      status: answer.status ?? 200,
+      headers: {
+        ...cors,
+        "content-type": "text/turtle",
+        // The browser hides WAC-Allow from the app unless the Pod exposes it, as real Pods do.
+        "access-control-expose-headers": "WAC-Allow",
+        ...(answer.wacAllow === undefined ? {} : { "wac-allow": answer.wacAllow }),
+      },
+      body: answer.body ?? "<> a <http://www.w3.org/ns/ldp#BasicContainer> .",
+    });
+  });
+  return { authorization: () => authorization, tokenRequests, podRequests };
 }
 
 const webId = `${alice}#me`;
@@ -160,8 +191,8 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
-  // back, the exchange, then the profile again and the Pod's check.
-  await expect(timeline.getByRole("listitem")).toHaveCount(8);
+  // back, the exchange, the profile again and the Pod's check, then the Pod.
+  await expect(timeline.getByRole("listitem")).toHaveCount(9);
   await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(1);
   await expect(timeline).not.toContainText("one-time-code-0123456789");
 
@@ -439,4 +470,50 @@ test("logs out, forgetting the session, key, stored values and timeline", async 
     return JSON.parse(Buffer.from(header, "base64url").toString()).jwk;
   });
   expect(keys[1]).not.toEqual(keys[0]);
+});
+
+test("browses the Pod as the logged-in person, a folder at a time", async ({ page }) => {
+  const provider = await serveAlice(page, {
+    pod: {
+      [pod]: {
+        wacAllow: 'user="read write append control",public="read"',
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ;
+          <http://www.w3.org/ns/ldp#contains> <notes/>, <hello.txt>, <private/> .
+          <hello.txt> <http://www.w3.org/ns/posix/stat#size> 12 .`,
+      },
+      [`${pod}notes/`]: {
+        wacAllow: 'user="read",public=""',
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ; <http://www.w3.org/ns/ldp#contains> <shopping.txt> .`,
+      },
+      [`${pod}private/`]: { status: 403, body: "" },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+
+  const browser = page.locator("pod-browser");
+  await expect(browser.getByRole("heading", { name: "Your Pod" })).toBeVisible();
+  await expect(
+    browser.getByText("Here you may: read, write, append, control. Everyone may: read."),
+  ).toBeVisible();
+  await expect(browser.getByText("hello.txt")).toBeVisible();
+  await expect(browser.getByText("(12 bytes)")).toBeVisible();
+
+  await browser.getByRole("button", { name: "notes/" }).click();
+  await expect(browser.getByText("shopping.txt")).toBeVisible();
+  await expect(browser.getByText("Here you may: read. Everyone may: nothing.")).toBeVisible();
+  await expect(browser.getByRole("navigation", { name: "Where you are" })).toContainText("notes");
+
+  await browser.getByRole("button", { name: "alice" }).click();
+  await browser.getByRole("button", { name: "private/" }).click();
+  await expect(browser.getByRole("alert")).toContainText("You aren't allowed to read this");
+  await expect(browser.getByRole("alert")).toContainText("knows who you are");
+
+  // Every request carried the token and its own proof, for its own URL.
+  const proofs = provider.podRequests.map((request) => {
+    const payload = (request.headers()["dpop"] ?? "").split(".")[1] ?? "";
+    return JSON.parse(Buffer.from(payload, "base64url").toString());
+  });
+  expect(proofs.map((proof) => proof.htu)).toEqual([pod, `${pod}notes/`, pod, `${pod}private/`]);
+  expect(new Set(proofs.map((proof) => proof.jti)).size).toBe(4);
 });
