@@ -9,6 +9,7 @@
 import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
+import type { ReadProblem } from "./pod-read.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
@@ -362,8 +363,8 @@ export function describeRegistrationProblem(problem: RegistrationProblem, issuer
   }
 }
 
-/** Why a container in the Pod couldn't be listed. */
-export function describeContainerProblem(problem: ContainerProblem, url: URL): Message {
+/** Why the Pod wouldn't let the app read something, container or not. */
+export function describeReadProblem(problem: ReadProblem, url: URL): Message {
   switch (problem.kind) {
     case "request-failed":
       return { summary: `${url.href} couldn't be fetched`, detail: problem.diagnosis.summary };
@@ -377,7 +378,7 @@ export function describeContainerProblem(problem: ContainerProblem, url: URL): M
       return {
         summary: "You aren't allowed to read this",
         detail:
-          "The Pod answered 403. It knows who you are, but its access rules don't let you read this container. Logging in proved who you are; what you may do is up to the Pod's owner.",
+          "The Pod answered 403. It knows who you are, but its access rules don't let you read this. Logging in proved who you are; what you may do is up to the Pod's owner.",
       };
     case "not-found":
       return {
@@ -389,6 +390,24 @@ export function describeContainerProblem(problem: ContainerProblem, url: URL): M
         summary: "The Pod returned an error",
         detail: `It answered ${problem.status} for ${url.href}.`,
       };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+/** Why a container in the Pod couldn't be listed. */
+export function describeContainerProblem(problem: ContainerProblem, url: URL): Message {
+  switch (problem.kind) {
+    case "request-failed":
+    case "unauthenticated":
+    case "forbidden":
+    case "not-found":
+    case "http-error":
+      return describeReadProblem(problem, url);
     case "not-turtle":
       return {
         summary: "The Pod didn't send a listing the app can read",
