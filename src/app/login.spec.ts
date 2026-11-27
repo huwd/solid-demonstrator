@@ -400,3 +400,41 @@ test("warns when the access token is bound to another key", async ({ page }) => 
     "bound to a different key",
   );
 });
+
+test("logs out, forgetting the session, key, stored values and timeline", async ({ page }) => {
+  const registrations = await serveRegistration(page);
+  const provider = await serveAlice(page, { discovery: registrationOnly });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+
+  await page.getByRole("button", { name: "Log out" }).click();
+
+  await expect(page.getByText("Logged out", { exact: true })).toBeVisible();
+  await expect(page.getByText(/log out on https:\/\/id\.example's own site/)).toBeVisible();
+  await expect(page.getByText(`Logged in as ${webId}`)).toHaveCount(0);
+  await expect(page.locator("trace-timeline")).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.length)).toBe(0);
+  const key = await page.evaluate(
+    () =>
+      new Promise<unknown>((resolve) => {
+        const opening = indexedDB.open("solid-demonstrator");
+        opening.onsuccess = () => {
+          const read = opening.result.transaction("keys").objectStore("keys").get("dpop");
+          read.onsuccess = () => resolve(read.result ?? null);
+        };
+      }),
+  );
+  expect(key, "the DPoP key is deleted").toBeNull();
+
+  // The next login starts afresh: a new registration and a new key.
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  expect(registrations).toHaveLength(2);
+  const keys = provider.tokenRequests.map((request) => {
+    const header = (request.headers()["dpop"] ?? "").split(".")[0] ?? "";
+    return JSON.parse(Buffer.from(header, "base64url").toString()).jwk;
+  });
+  expect(keys[1]).not.toEqual(keys[0]);
+});

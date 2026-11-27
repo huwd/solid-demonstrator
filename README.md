@@ -26,11 +26,13 @@ While you're at your identity provider logging in, the demonstrator keeps the on
 
 Once you're logged in, the access token is kept only in the page's memory, so it's gone when you reload or close the page. The key that the token is bound to is kept in your browser's IndexedDB for this site, so the next login can use it again. The browser won't let anyone export its private half, not even the demonstrator.
 
+Logging out removes all of this: the token, the key, what's in session storage and the timeline. You may still be logged in at your identity provider itself, since that's its own site.
+
 Your browser only lets the demonstrator read a server's response if the server allows requests from other sites, using CORS. Solid servers are expected to. If one doesn't, the demonstrator says so.
 
 ## Status
 
-Discovery is complete, and login, milestone 2, is in progress. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
+Discovery and login, milestones 1 and 2, are complete. Reading the Pod, milestone 3, is next. [`CHANGELOG.md`](CHANGELOG.md) lists what has changed.
 
 - [`OUTCOMES.md`](OUTCOMES.md) sets out what the demonstrator must let people do and understand.
 - [`PLAN.md`](PLAN.md) describes how to build it, in milestones.
