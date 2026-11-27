@@ -1,0 +1,19 @@
+{
+  "name": "solid-demonstrator",
+  "version": "0.0.0",
+  "description": "A browser-only Solid app that shows each exchange between the app, the WebID profile, the identity provider and the Pod",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=26.13.1"
+  },
+  "scripts": {
+    "check": "pnpm run docs:lint && pnpm run docs:prose",
+    "docs:lint": "markdownlint-cli2",
+    "docs:prose": "git ls-files -z --cached --others --exclude-standard '*.md' | xargs --null vale"
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "0.24.2"
+  }
+}
