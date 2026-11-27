@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { clientMetadata } from "./client-id.ts";
-import { registerClient } from "./registration.ts";
+import { recordReusedRegistration, registerClient } from "./registration.ts";
 import { createTrace, type Trace } from "./trace.ts";
 import { createTracedFetch } from "./traced-fetch.ts";
 
@@ -105,5 +105,16 @@ describe("registerClient", () => {
     const result = await run();
     assert.ok(!result.ok);
     assert.equal(result.problem.kind, "request-failed");
+  });
+});
+
+describe("recordReusedRegistration", () => {
+  it("explains, without a request, that an earlier registration is used again", () => {
+    const trace = createTrace({ now: () => new Date("2026-11-27T12:00:00Z"), entriesMax: 10 });
+    recordReusedRegistration(trace, "https://id.example", "registered-client");
+    const [entry] = trace.entries();
+    assert.equal(entry?.provenance, "explained");
+    assert.equal(entry?.request, undefined);
+    assert.match(entry?.purpose ?? "", /registered-client.+earlier in this tab/);
   });
 });

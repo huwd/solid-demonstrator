@@ -92,3 +92,26 @@ function parseObject(body: string): Readonly<Record<string, unknown>> {
 function text(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
+
+/**
+ * Records that the app used a client_id it registered earlier in the tab,
+ * so the timeline says why no registration request appears this time.
+ */
+export function recordReusedRegistration(
+  trace: Pick<Trace, "add">,
+  issuer: string,
+  clientId: string,
+): void {
+  trace.add({
+    step: "registerClient",
+    from: "app",
+    to: "app",
+    purpose: `Use the client_id ${clientId}, which ${issuer} gave the app earlier in this tab.`,
+    provenance: "explained",
+    explanation:
+      "The app registered with this provider earlier in this tab, so it uses the same registration again rather than making a new one each time. The registration is kept in session storage, so a new tab registers again. If the provider has forgotten it, logging in again from a new tab registers afresh.",
+    specification:
+      "https://openid.net/specs/openid-connect-registration-1_0.html#ClientRegistration",
+    verdict: { kind: "as-expected" },
+  });
+}

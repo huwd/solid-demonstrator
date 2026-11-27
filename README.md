@@ -22,7 +22,7 @@ If you don't have a WebID, you can use anyone's, since profiles are public. Logg
 
 The demonstrator runs entirely in your browser. It sends requests straight from your browser to the servers your WebID names, and to no one else.
 
-While you're at your identity provider logging in, the demonstrator keeps the one-time secrets for the login, and its timeline, in your browser's session storage, for that tab only. It removes the secrets as soon as you come back.
+While you're at your identity provider logging in, the demonstrator keeps the one-time secrets for the login, and its timeline, in your browser's session storage, for that tab only. It removes the secrets as soon as you come back. If it had to register with your identity provider, it also keeps the `client_id` it was given there for that tab, so logging in again doesn't register again.
 
 Once you're logged in, the access token is kept only in the page's memory, so it's gone when you reload or close the page. The key that the token is bound to is kept in your browser's IndexedDB for this site, so the next login can use it again. The browser won't let anyone export its private half, not even the demonstrator.
 

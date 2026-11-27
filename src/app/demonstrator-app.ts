@@ -5,7 +5,14 @@ import { type DiscoveryResult, discover } from "../core/discovery.ts";
 import type { IssuerConfiguration } from "../core/issuer.ts";
 import { generateDpopKeyPair, type PendingLogin, prepareLogin } from "../core/login.ts";
 import { isLoginReturn, returnFromLogin } from "../core/login-return.ts";
-import { type SavedLogin, saveLogin, takeLogin } from "../core/login-storage.ts";
+import {
+  forgetRegistration,
+  recallRegistration,
+  rememberRegistration,
+  type SavedLogin,
+  saveLogin,
+  takeLogin,
+} from "../core/login-storage.ts";
 import {
   describeExchangeProblem,
   describeRegistrationProblem,
@@ -13,7 +20,7 @@ import {
   describeWebIdProblem,
   type Message,
 } from "../core/messages.ts";
-import { registerClient } from "../core/registration.ts";
+import { recordReusedRegistration, registerClient } from "../core/registration.ts";
 import { exchangeCode, type Session } from "../core/token-exchange.ts";
 import { type Inspection, inspectSession } from "../core/token-inspection.ts";
 import { checkTokenWebId, type WebIdCheckResult } from "../core/token-webid-check.ts";
@@ -162,6 +169,9 @@ export class DemonstratorApp extends LitElement {
     const { pending } = saved;
     const result = returnFromLogin(pending, here, this.#trace);
     if (!result.ok) {
+      if (result.problem.kind === "refused") {
+        forgetRejectedClient(pending, result.problem.error);
+      }
       this.state = {
         kind: "login-failed",
         message: describeReturnProblem(result.problem, pending.issuer),
@@ -181,6 +191,9 @@ export class DemonstratorApp extends LitElement {
       this.#trace,
     );
     if (!result.ok) {
+      if (result.problem.kind === "refused") {
+        forgetRejectedClient(pending, result.problem.error);
+      }
       this.state = {
         kind: "login-failed",
         message: describeExchangeProblem(result.problem, pending.issuer),
@@ -393,7 +406,11 @@ export class DemonstratorApp extends LitElement {
   async #logIn(state: State & { kind: "done" }, configuration: IssuerConfiguration): Promise<void> {
     const site = siteUrl();
     let clientId = new URL(clientIdDocumentPath, site).href;
-    if (!configuration.clientIdDocuments && configuration.registrationEndpoint !== null) {
+    const registered = recalledRegistration(configuration.issuer, site.href);
+    if (!configuration.clientIdDocuments && registered !== null) {
+      recordReusedRegistration(this.#trace, configuration.issuer, registered);
+      clientId = registered;
+    } else if (!configuration.clientIdDocuments && configuration.registrationEndpoint !== null) {
       this.state = { ...state, loginProblem: null, registering: true };
       const registration = await registerClient(
         this.#tracedFetch,
@@ -410,6 +427,11 @@ export class DemonstratorApp extends LitElement {
         return;
       }
       clientId = registration.clientId;
+      try {
+        rememberRegistration(sessionStorage, configuration.issuer, site.href, clientId);
+      } catch {
+        // Storage is blocked: the next login registers again.
+      }
     }
     const prepared = await prepareLogin(configuration, { clientId, redirectUri: site.href });
     const saved: SavedLogin = { pending: prepared.pending, entries: this.#trace.entries() };
@@ -448,6 +470,30 @@ function chosenConfiguration(state: State & { kind: "done" }): IssuerConfigurati
   const issuer = state.choice.issuer;
   const finding = state.result.providers.find((provider) => provider.issuer === issuer);
   return finding?.result.ok === true ? finding.result.configuration : null;
+}
+
+/** A client_id registered earlier in this tab, or null, including when storage is blocked. */
+function recalledRegistration(issuer: string, redirectUri: string): string | null {
+  try {
+    return recallRegistration(sessionStorage, issuer, redirectUri);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forgets a registration the provider no longer recognises, so the next
+ * login registers again rather than failing the same way.
+ */
+function forgetRejectedClient(pending: PendingLogin, error: string): void {
+  if (error !== "invalid_client" && error !== "unauthorized_client") {
+    return;
+  }
+  try {
+    forgetRegistration(sessionStorage, pending.issuer, pending.redirectUri);
+  } catch {
+    // Storage is blocked, so nothing was kept.
+  }
 }
 
 /**
