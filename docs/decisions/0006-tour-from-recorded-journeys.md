@@ -1,6 +1,6 @@
 # 0006. Build the tour from recordings of the real steps against fictional servers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Decided by:** @huwd
 - **Decided:** 2026-11-27
 - **Recorded:** 2026-11-27
@@ -43,7 +43,7 @@ Real and personal, but it would publish details of a real deployment and account
 
 ## Decision
 
-Proposed: the tour replays recordings of the real steps against the test environment, for fictional people, through the same code as a live session.
+The tour replays recordings of the real steps against the test environment, for fictional people, through the same code as a live session.
 
 ## Consequences
 

@@ -1,6 +1,6 @@
 # 0008. Keep tokens in memory, and the DPoP key as a non-extractable key in IndexedDB
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Decided by:** @huwd
 - **Decided:** 2026-11-27
 - **Recorded:** 2026-11-27
@@ -37,7 +37,7 @@ Smoother, but puts the longest-lived credential in storage, and refresh tokens a
 
 ## Decision
 
-Proposed: the demonstrator keeps tokens in memory only, keeps the DPoP key as a non-extractable key in IndexedDB, and keeps the other login values and the trace in session storage for the tab.
+The demonstrator keeps tokens in memory only, keeps the DPoP key as a non-extractable key in IndexedDB, and keeps the other login values and the trace in session storage for the tab.
 
 ## Consequences
 

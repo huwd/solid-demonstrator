@@ -72,9 +72,13 @@ Checking the DPoP proof and the access rules happen only on the Pod, so those ar
 
 Both views render the same journey and trace. Switching views keeps the person's place.
 
-### Client ID Document
+### How the app identifies itself
+
+[Decision 0009](docs/decisions/0009-client-id-documents-with-registration-fallback.md) sets the order: a Client ID Document where the identity provider accepts one, and dynamic client registration where it doesn't. The identity provider's discovery document decides: `client_id_metadata_document_supported` means a Client ID Document, and otherwise a `registration_endpoint` means dynamic registration.
 
 The app publishes its Client ID Document at `/clientid.jsonld`. Its `client_id` and `redirect_uris` depend on the origin the app is served from, so the build writes the document from a `SITE_URL` setting. The identity provider allows token requests only from the origins of the `redirect_uris`, so the document must match the origin the app runs on.
+
+With dynamic registration, the app sends its name and redirect URIs to the `registration_endpoint` as a public client, with no client secret, and gets a `client_id` back. The registration request and response appear in the trace like any other exchange.
 
 Hosting is otherwise open. GitHub Pages and Cloudflare Pages both work. Cloudflare Pages preview deployments each have their own origin, so each preview would need its own build of the document.
 
@@ -83,7 +87,7 @@ Hosting is otherwise open. GitHub Pages and Cloudflare Pages both work. Cloudfla
 The traced `fetch` classifies each failure:
 
 - **HTTP errors:** the status, the relevant headers such as `WWW-Authenticate`, and an OAuth error body if there is one.
-- **Protocol mismatches:** a missing `solid:oidcIssuer`, an `iss` or `state` that doesn't match, an identity provider without `client_id_metadata_document_supported`.
+- **Protocol mismatches:** a missing `solid:oidcIssuer`, an `iss` or `state` that doesn't match, an identity provider that accepts neither a Client ID Document nor dynamic registration.
 - **Blocked or unreachable:** the browser raises the same error for a CORS refusal, a DNS failure or a refused connection, and hides which. The app then repeats the request with `mode: "no-cors"`. If that gets an opaque response, the server is reachable and the likely cause is CORS. The diagnosis is labelled as a diagnosis.
 
 ### The tour
@@ -116,13 +120,13 @@ Following solid-oidc's [decision 0010](https://github.com/huwd/solid-oidc/blob/m
 - **Steps and modules:** `node:test`, with full coverage. Node has WebCrypto and `fetch`, so the steps run in Node with a traced `fetch` pointed at local servers.
 - **Real servers:** a Docker Compose environment with:
   - the solid-oidc broker and its sandbox, for a split stack with an upstream login
-  - a Community Solid Server with its own identity provider, for a single-service stack
+  - a Community Solid Server with its own identity provider, for a single-service stack, and for dynamic registration if it offers it; otherwise another identity provider that does
   - a Community Solid Server with identity disabled, trusting the broker, matching the stack in [composer](https://github.com/huwd/composer)
   - static WebID profiles covering the cases in outcome 2: one issuer, several issuers, several Pods, and none
 - **Fixtures:** recorded responses from real servers, for failures a real server won't produce on demand. Each fixture records where and when it was captured.
 - **End to end:** the full journey in a browser against the Compose environment.
 
-Identity providers fetch the Client ID Document themselves, so a remote provider can't reach one on `localhost`. Local development therefore runs against the Compose environment, where the broker allows loopback Client ID Documents. Whether the Community Solid Server's identity provider accepts a loopback Client ID Document needs checking in milestone 2. Live providers are tested from a deployed build.
+Identity providers fetch the Client ID Document themselves, so a remote provider can't reach one on `localhost`. Local development therefore runs against the Compose environment, where the broker allows loopback Client ID Documents, or uses dynamic registration with identity providers that offer it, since registration needs no fetch back to the app. Whether the Community Solid Server's identity provider accepts a loopback Client ID Document needs checking in milestone 2. Live providers are tested from a deployed build.
 
 ## Milestones
 
@@ -132,7 +136,7 @@ Each milestone ends with something a person can use, and with its documentation 
 
 - devenv, pnpm, markdownlint and Vale, matching solid-oidc, with Vale errors failing the build ([0007](docs/decisions/0007-toolchain.md)).
 - CI that runs the checks, with read-only workflows and pinned actions.
-- Decision records for the choices made in planning ([0000](docs/decisions/0000-record-decisions.md) to [0009](docs/decisions/0009-client-id-documents-only.md)).
+- Decision records for the choices made in planning ([0000](docs/decisions/0000-record-decisions.md) to [0009](docs/decisions/0009-client-id-documents-with-registration-fallback.md)).
 
 Biome, TypeScript and `node:test` join the checks with the first code, in milestone 1.
 
@@ -151,7 +155,7 @@ At the end, anyone can type a WebID and see the full discovery chain on a deploy
 
 Outcomes 3, 4, 11 and 12.
 
-- The Client ID Document, built from `SITE_URL`.
+- The Client ID Document, built from `SITE_URL`, and the fallback to dynamic client registration.
 - PKCE, DPoP key generation and storage, the redirect, the return and the code exchange.
 - Reconstructed and explained entries for the identity provider's side.
 - The token inspector, and the check that the token's WebID names this issuer.
@@ -200,12 +204,6 @@ Outcome 11's export, and outcome 13.
 ## Decisions
 
 [`docs/decisions/`](docs/decisions/README.md) records the decisions this plan rests on. Check a change against the accepted records before making it.
-
-Still proposed, and to settle before the milestone that depends on them:
-
-- [0006](docs/decisions/0006-tour-from-recorded-journeys.md): building the tour from recordings, before milestone 7
-- [0008](docs/decisions/0008-tokens-in-memory-key-in-indexeddb.md): tokens in memory and the DPoP key in IndexedDB, before milestone 2
-- [0009](docs/decisions/0009-client-id-documents-only.md): Client ID Documents only, before milestone 2
 
 Still to record:
 

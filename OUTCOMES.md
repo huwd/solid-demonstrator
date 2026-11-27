@@ -57,7 +57,7 @@ A person can see the discovery chain, step by step:
 
 1. The WebID is fetched. The fragment (`#me`) is not sent, and the demonstrator says why.
 2. The profile is parsed, and the statements that matter are picked out: `solid:oidcIssuer` and `pim:storage`, plus anything else used later.
-3. Each identity provider's discovery document is fetched, showing that it supports Solid-OIDC and accepts Client ID Documents.
+3. Each identity provider's discovery document is fetched, showing that it supports Solid-OIDC and which ways it accepts for an app to identify itself.
 
 Where the profile offers a choice, the person makes it:
 
@@ -67,9 +67,11 @@ Where the profile offers a choice, the person makes it:
 
 ### 3. Log in through their own identity provider
 
-A person can log in with any Solid-OIDC identity provider that accepts Client ID Documents.
+A person can log in with any Solid-OIDC identity provider that accepts a Client ID Document or dynamic client registration.
 
 - The demonstrator identifies itself with a Client ID Document published alongside it, and shows that document.
+- Where the identity provider doesn't accept Client ID Documents, the demonstrator registers itself on the fly with dynamic client registration instead, and shows the registration.
+- The demonstrator says which method it used and why, and what difference it makes: a Client ID Document is a URL the identity provider can check, while a dynamically registered name is only what the app claims.
 - The person consents on their identity provider's own pages. The demonstrator explains, before the person leaves, what will happen there and that the demonstrator can't see it.
 - On return, the demonstrator shows what came back and what it checked: the `state` matches, the `iss` matches the chosen identity provider, and the code is exchanged using PKCE and a DPoP proof.
 - The demonstrator shows the decoded tokens: who issued them, the WebID they name, who they are for, when they expire, and the key they are bound to.
@@ -139,7 +141,7 @@ Explained steps are drawn from the specifications and from known behaviour of co
 When something fails, a person can see where, and what it means:
 
 - The failing step is marked in the timeline and the diagram, with the party that refused.
-- The demonstrator says what was expected, what happened, and the likely causes. For example: a profile with no `solid:oidcIssuer`, an identity provider that doesn't accept Client ID Documents, a response the browser blocked because of CORS, an `iss` that doesn't match, or a `403` from the Pod.
+- The demonstrator says what was expected, what happened, and the likely causes. For example: a profile with no `solid:oidcIssuer`, an identity provider that accepts neither a Client ID Document nor dynamic registration, a response the browser blocked because of CORS, an `iss` that doesn't match, or a `403` from the Pod.
 - Where the browser hides the cause, as it does for CORS failures, the demonstrator says so and gives its best diagnosis, labelled as a diagnosis.
 - The person can retry from the failed step without starting again, where the protocol allows.
 
@@ -179,10 +181,8 @@ A person with no WebID can still understand the whole journey, and can get an ac
 - A production Pod browser. The demonstrator supports enough operations to show the plumbing, not every Solid feature.
 - Editing access rules. Viewing them is in scope; a mistake in editing them can lock the owner out of their own Pod.
 - Webhook notifications. They need a server to receive them, and the demonstrator has none.
-- Identity providers that support only dynamic client registration. See the open questions.
 
 ## Open questions
 
 - **Which public providers to recommend.** Outcome 13 links to public providers for sign-up. The choice depends on which ones work well with the demonstrator, which the testing against hosted providers will show.
-- **Dynamic client registration.** Some identity providers don't accept Client ID Documents and only support registering a client on the fly. Supporting it would widen the identity providers the demonstrator works with, and would show a second way for an app to identify itself, at the cost of another path to build and explain.
 - **Which hosted providers to test against.** The demonstrator should be checked against at least one hosted provider where the WebID, identity provider and Pod are one service, as well as against the split stack.

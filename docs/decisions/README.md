@@ -64,7 +64,7 @@ Editorial improvements, such as clearer wording, typo corrections and link fixes
 | [0003](0003-static-app-for-any-solid-stack.md) | Ship a static app that works with any compliant Solid stack | Accepted |
 | [0004](0004-label-how-each-step-is-known.md) | Label how each step is known, and never present explanations as logs | Accepted |
 | [0005](0005-redact-secrets-in-one-place.md) | Redact secrets in one place, with fixed rules for each kind of value | Accepted |
-| [0006](0006-tour-from-recorded-journeys.md) | Build the tour from recordings of the real steps against fictional servers | Proposed |
+| [0006](0006-tour-from-recorded-journeys.md) | Build the tour from recordings of the real steps against fictional servers | Accepted |
 | [0007](0007-toolchain.md) | Use solid-oidc's toolchain, with Vale as a required check | Accepted |
-| [0008](0008-tokens-in-memory-key-in-indexeddb.md) | Keep tokens in memory, and the DPoP key as a non-extractable key in IndexedDB | Proposed |
-| [0009](0009-client-id-documents-only.md) | Identify the app with a Client ID Document only | Proposed |
+| [0008](0008-tokens-in-memory-key-in-indexeddb.md) | Keep tokens in memory, and the DPoP key as a non-extractable key in IndexedDB | Accepted |
+| [0009](0009-client-id-documents-with-registration-fallback.md) | Identify the app with a Client ID Document, falling back to dynamic registration | Accepted |
