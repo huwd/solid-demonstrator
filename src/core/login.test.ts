@@ -6,6 +6,7 @@ import { generateDpopKeyPair, loginScope, prepareLogin } from "./login.ts";
 const configuration = {
   issuer: "https://id.example",
   authorizationEndpoint: new URL("https://id.example/auth?tenant=demo"),
+  issParameterSupported: true,
 };
 const client = {
   clientId: "https://app.example/clientid.jsonld",
@@ -16,6 +17,7 @@ describe("prepareLogin", () => {
   it("sends the person to the authorization endpoint with every parameter", async () => {
     const { authorizationUrl, pending } = await prepareLogin(configuration, client);
     assert.equal(authorizationUrl.origin + authorizationUrl.pathname, "https://id.example/auth");
+    assert.equal(pending.authorizationUrl, authorizationUrl.href);
     const parameters = Object.fromEntries(authorizationUrl.searchParams);
     assert.deepEqual(parameters, {
       tenant: "demo",
@@ -42,6 +44,7 @@ describe("prepareLogin", () => {
   it("keeps what the return will need, for this issuer and client", async () => {
     const { pending } = await prepareLogin(configuration, client);
     assert.equal(pending.issuer, "https://id.example");
+    assert.equal(pending.issParameterSupported, true);
     assert.equal(pending.clientId, client.clientId);
     assert.equal(pending.redirectUri, client.redirectUri);
     for (const secret of [pending.codeVerifier, pending.state, pending.nonce]) {

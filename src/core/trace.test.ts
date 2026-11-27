@@ -28,6 +28,20 @@ describe("createTrace", () => {
     );
   });
 
+  it("carries on from restored entries, numbering after them", () => {
+    const before = createTrace({ now: fixedNow, entriesMax: 10 });
+    before.add(profileFetch);
+    const saved: TraceEntry[] = JSON.parse(JSON.stringify(before.entries()));
+
+    const after = createTrace({ now: fixedNow, entriesMax: 10, restored: saved });
+    const next = after.add({ ...profileFetch, step: "returnFromLogin" });
+    assert.equal(next.id, 2);
+    assert.deepEqual(
+      after.entries().map((entry) => entry.step),
+      ["fetchWebIdProfile", "returnFromLogin"],
+    );
+  });
+
   it("keeps a verdict and decoded tokens given when the entry is added", () => {
     const trace = createTrace({ now: fixedNow, entriesMax: 10 });
     const entry = trace.add({

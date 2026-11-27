@@ -151,6 +151,7 @@ describe("discoverIssuer", () => {
     const result = await discoverIssuer(tracedFetch, "https://id.huwdiprose.co.uk", trace);
     assert.ok(result.ok);
     assert.equal(result.configuration.clientIdDocuments, true);
+    assert.equal(result.configuration.issParameterSupported, true);
     assert.equal(result.configuration.registrationEndpoint, null);
     assert.deepEqual(result.configuration.gaps, []);
     assert.equal(result.configuration.tokenEndpoint.origin, "https://id.huwdiprose.co.uk");
@@ -202,6 +203,7 @@ describe("discoverIssuer", () => {
       result.configuration.registrationEndpoint?.href,
       `${origin}/registration-only/register`,
     );
+    assert.equal(result.configuration.issParameterSupported, false, "not stated, so not expected");
     assert.deepEqual(result.configuration.gaps, []);
   });
 

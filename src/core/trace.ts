@@ -99,10 +99,15 @@ export interface TraceOptions {
   readonly now: () => Date;
   /** A journey that exceeds this has gone wrong, so adding more throws. */
   readonly entriesMax: number;
+  /**
+   * Entries saved before the page left for the identity provider, so the
+   * trace carries on where it was when the person comes back.
+   */
+  readonly restored?: readonly TraceEntry[];
 }
 
 export function createTrace(options: TraceOptions): Trace {
-  let entries: readonly TraceEntry[] = [];
+  let entries: readonly TraceEntry[] = options.restored ?? [];
   const listeners = new Set<(entries: readonly TraceEntry[]) => void>();
 
   function publish(next: readonly TraceEntry[]): void {
