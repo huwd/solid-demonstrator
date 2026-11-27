@@ -1,7 +1,8 @@
 import { css, html, LitElement, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { type Access, type ContainerResult, readContainer } from "../core/container.ts";
-import { describeContainerProblem } from "../core/messages.ts";
+import { describeContainerProblem, describeReadProblem, type Message } from "../core/messages.ts";
 import type { PodFetch } from "../core/pod-fetch.ts";
+import { type ResourceResult, readResource } from "../core/resource.ts";
 import type { Trace } from "../core/trace.ts";
 
 /**
@@ -16,6 +17,8 @@ export class PodBrowser extends LitElement {
     root: { attribute: false },
     current: { state: true },
     result: { state: true },
+    viewing: { state: true },
+    resource: { state: true },
   };
 
   declare podFetch: PodFetch | null;
@@ -25,6 +28,10 @@ export class PodBrowser extends LitElement {
   declare current: URL | null;
   /** Null while the container is being read. */
   declare result: ContainerResult | null;
+  /** The resource opened from the current container, if one is. */
+  declare viewing: URL | null;
+  /** Null while the resource is being read. */
+  declare resource: ResourceResult | null;
 
   static override styles = css`
     :host {
@@ -64,6 +71,14 @@ export class PodBrowser extends LitElement {
       font-weight: bold;
       margin: 0;
     }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      max-height: 30rem;
+      overflow: auto;
+      padding: 0.5rem;
+      border: 1px solid GrayText;
+    }
   `;
 
   constructor() {
@@ -73,6 +88,8 @@ export class PodBrowser extends LitElement {
     this.root = null;
     this.current = null;
     this.result = null;
+    this.viewing = null;
+    this.resource = null;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -94,7 +111,13 @@ export class PodBrowser extends LitElement {
         proof. The timeline shows every request.
       </p>
       ${this.#renderPath(root, current)}
-      ${result === null ? html`<p role="status">Reading ${current.href}…</p>` : this.#renderResult(current, result)}
+      ${
+        this.viewing !== null
+          ? this.#renderResource(this.viewing, current)
+          : result === null
+            ? html`<p role="status">Reading ${current.href}…</p>`
+            : this.#renderResult(current, result)
+      }
     `;
   }
 
@@ -121,11 +144,7 @@ export class PodBrowser extends LitElement {
 
   #renderResult(current: URL, result: ContainerResult): TemplateResult {
     if (!result.ok) {
-      const message = describeContainerProblem(result.problem, current);
-      return html`<div class="problem" role="alert">
-        <p class="summary">${message.summary}</p>
-        <p>${message.detail}</p>
-      </div>`;
+      return problem(describeContainerProblem(result.problem, current));
     }
     const { contains, access } = result.container;
     return html`
@@ -141,7 +160,9 @@ export class PodBrowser extends LitElement {
                       ? html`<button class="link" @click=${() => this.#open(item.url)}>
                           ${nameOf(item.url, current)}
                         </button>`
-                      : nameOf(item.url, current)
+                      : html`<button class="link" @click=${() => this.#view(item.url)}>
+                          ${nameOf(item.url, current)}
+                        </button>`
                   }
                   ${meta(item.size, item.modified)}
                 </li>`,
@@ -151,12 +172,59 @@ export class PodBrowser extends LitElement {
     `;
   }
 
+  #renderResource(url: URL, container: URL): TemplateResult {
+    const back = html`<p>
+      <button class="link" @click=${() => this.#closeResource()}>Back to ${nameOf(container, this.root ?? container)}</button>
+    </p>`;
+    const resource = this.resource;
+    if (resource === null) {
+      return html`${back}<p role="status">Reading ${url.href}…</p>`;
+    }
+    if (!resource.ok) {
+      return html`${back}${problem(describeReadProblem(resource.problem, url))}`;
+    }
+    const { contentType, text, size, etag, access } = resource.resource;
+    return html`
+      ${back}
+      <h3>${nameOf(url, container)}</h3>
+      <p>
+        ${contentType ?? "No content type"}${size === null ? "" : `, ${size.toLocaleString("en-GB")} bytes`}.
+        ${etag === null ? "The Pod sent no ETag." : `Its ETag, this version's name, is ${etag}.`}
+      </p>
+      <p>${describeAccess(access)}</p>
+      ${
+        text === null
+          ? html`<p>The app shows only text, so it doesn't show this resource's content.</p>`
+          : html`<pre tabindex="0" aria-label="Content of ${nameOf(url, container)}">${text}</pre>`
+      }
+    `;
+  }
+
+  async #view(url: URL): Promise<void> {
+    if (this.podFetch === null || this.trace === null) {
+      return;
+    }
+    this.viewing = url;
+    this.resource = null;
+    const resource = await readResource(this.podFetch, url, this.trace);
+    if (this.viewing === url) {
+      this.resource = resource;
+    }
+  }
+
+  #closeResource(): void {
+    this.viewing = null;
+    this.resource = null;
+  }
+
   async #open(url: URL): Promise<void> {
     if (this.podFetch === null || this.trace === null) {
       return;
     }
     this.current = url;
     this.result = null;
+    this.viewing = null;
+    this.resource = null;
     const result = await readContainer(this.podFetch, url, this.trace);
     // Only show the answer for the folder still being looked at.
     if (this.current === url) {
@@ -174,6 +242,13 @@ function nameOf(url: URL, base: URL): string {
   }
   const relative = url.href.startsWith(base.href) ? url.href.slice(base.href.length) : url.href;
   return decodeURIComponent(relative);
+}
+
+function problem(message: Message): TemplateResult {
+  return html`<div class="problem" role="alert">
+    <p class="summary">${message.summary}</p>
+    <p>${message.detail}</p>
+  </div>`;
 }
 
 function describeAccess(access: Access | null): string {
