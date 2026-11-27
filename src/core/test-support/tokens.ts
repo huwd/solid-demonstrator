@@ -3,12 +3,20 @@
  * make them, so redaction is tested against the values it will meet.
  */
 
+const testKey = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+  "sign",
+  "verify",
+])) as CryptoKeyPair;
+
+/** The fictional provider's public keys, as it would publish them at its jwks_uri. */
+export async function testJwks(): Promise<{ keys: JsonWebKey[] }> {
+  const jwk = await crypto.subtle.exportKey("jwk", testKey.publicKey);
+  return { keys: [{ ...jwk, kid: "test-key", alg: "ES256" } as JsonWebKey] };
+}
+
+/** A JWT signed with the fictional provider's key, which testJwks publishes. */
 export async function signTestJwt(claims: Readonly<Record<string, unknown>>): Promise<string> {
-  const { privateKey } = await crypto.subtle.generateKey(
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
+  const { privateKey } = testKey;
   const header = encode({ alg: "ES256", typ: "at+jwt", kid: "test-key" });
   const payload = encode({ iss: "https://id.example", iat: 1_795_000_000, ...claims });
   const signingInput = `${header}.${payload}`;

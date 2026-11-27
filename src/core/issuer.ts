@@ -7,7 +7,7 @@
  */
 
 import type { Diagnosis, Trace } from "./trace.ts";
-import type { TracedFetch } from "./traced-fetch.ts";
+import type { RequestDescription, TracedFetch } from "./traced-fetch.ts";
 import { isAllowedScheme } from "./webid.ts";
 
 export interface IssuerConfiguration {
@@ -69,6 +69,8 @@ export async function discoverIssuer(
   tracedFetch: TracedFetch,
   issuer: string,
   trace: Pick<Trace, "settle">,
+  /** Why the configuration is fetched, when it isn't for login. */
+  reason?: Pick<RequestDescription, "step" | "purpose">,
 ): Promise<IssuerResult> {
   const url = discoveryUrl(issuer);
   if (url === null) {
@@ -83,6 +85,7 @@ export async function discoverIssuer(
         "Fetch the identity provider's discovery document, to find where to send the login and what the provider supports.",
       explanation: `The profile names ${issuer} as an identity provider. Each provider publishes its configuration at /.well-known/openid-configuration under its issuer.`,
       specification: "https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig",
+      ...reason,
     },
     url,
     headers: { accept: "application/json" },

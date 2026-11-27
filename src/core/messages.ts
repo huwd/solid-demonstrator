@@ -10,6 +10,7 @@ import type { ContainerProblem } from "./container.ts";
 import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ReadProblem } from "./pod-read.ts";
+import type { BeyondSolidRule, PodTrustProblem } from "./pod-trust-check.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
@@ -431,3 +432,41 @@ export function describeContainerProblem(problem: ContainerProblem, url: URL): M
     }
   }
 }
+
+/** Why the app's repeat of the Pod's checks of the token and proof didn't pass. */
+export function describePodTrustProblem(problem: PodTrustProblem, issuer: string): Message {
+  switch (problem.kind) {
+    case "issuer":
+      return {
+        summary: "The app couldn't find the provider's keys",
+        detail: `${describeIssuerProblem(problem.problem, issuer).summary}. A Pod reads the same configuration to find the keys that check a token, so it may refuse this one.`,
+      };
+    case "keys-unavailable":
+      return {
+        summary: "The provider's keys couldn't be fetched",
+        detail: `${problem.reason} Without them, neither the app nor a Pod can check the token's signature, so a Pod may refuse it.`,
+      };
+    case "beyond-solid":
+      return {
+        summary: "The token doesn't meet RFC 9068, but Solid doesn't require that",
+        detail: `${ruleDescriptions[problem.rule]} The app checks tokens with oauth4webapi, which follows RFC 9068's profile for access tokens and asks more than Solid-OIDC does. A Solid Pod need not refuse the token for this. The library stops at the first rule a token breaks, so the signature and the DPoP proof weren't checked.`,
+      };
+    case "refused":
+      return {
+        summary: "A Pod would refuse this token",
+        detail: `The check failed: ${problem.message}. A Pod makes the same check, so reading and writing won't work.`,
+      };
+    // Unreachable while the switch covers every problem.
+    /* node:coverage ignore next 4 */
+    default: {
+      const unhandled: never = problem;
+      throw new Error(`No message for ${JSON.stringify(unhandled)}`);
+    }
+  }
+}
+
+const ruleDescriptions: Record<BeyondSolidRule, string> = {
+  typ: "Its header doesn't give its type as at+jwt.",
+  jti: "It has no jti, an identifier for the token.",
+  sub: "It has no sub, as a string, naming who it's about.",
+};

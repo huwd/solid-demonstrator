@@ -1,5 +1,10 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
-import { describeWebIdCheckProblem, type Message } from "../core/messages.ts";
+import {
+  describePodTrustProblem,
+  describeWebIdCheckProblem,
+  type Message,
+} from "../core/messages.ts";
+import type { PodTrustResult } from "../core/pod-trust-check.ts";
 import type { Inspection, TokenSummary } from "../core/token-inspection.ts";
 import type { WebIdCheckResult } from "../core/token-webid-check.ts";
 
@@ -13,6 +18,7 @@ export class TokenInspector extends LitElement {
   static override properties = {
     inspection: { attribute: false },
     webIdCheck: { attribute: false },
+    podTrust: { attribute: false },
     issuer: { attribute: false },
     webId: { attribute: false },
   };
@@ -20,6 +26,7 @@ export class TokenInspector extends LitElement {
   declare inspection: Inspection | null;
   /** Null while the check is running. */
   declare webIdCheck: WebIdCheckResult | null;
+  declare podTrust: PodTrustResult | "no-pod" | null;
   declare issuer: string;
   declare webId: string | null;
 
@@ -65,6 +72,7 @@ export class TokenInspector extends LitElement {
     super();
     this.inspection = null;
     this.webIdCheck = null;
+    this.podTrust = null;
     this.issuer = "";
     this.webId = null;
   }
@@ -77,6 +85,7 @@ export class TokenInspector extends LitElement {
         you are. The access token is what the app will show the Pod.
       </p>
       ${this.#renderWebIdCheck()}
+      ${this.#renderPodTrust()}
       ${this.inspection === null ? html`<p role="status">Reading the tokens…</p>` : this.#renderInspection(this.inspection)}
     `;
   }
@@ -92,6 +101,27 @@ export class TokenInspector extends LitElement {
     return callout("ready", {
       summary: `The WebID's profile names ${this.issuer}`,
       detail: `A Pod checks this on every request: it fetches ${this.webId} and looks for ${this.issuer} among its identity providers. The app made the same check, and the Pod should accept the token.`,
+    });
+  }
+
+  #renderPodTrust(): TemplateResult | typeof nothing {
+    const check = this.podTrust;
+    if (this.webIdCheck === null) {
+      return nothing;
+    }
+    if (check === "no-pod") {
+      return html`<p>Your profile names no Pod, so the app has no request to check as a Pod would.</p>`;
+    }
+    if (check === null) {
+      return html`<p role="status">Checking the token and a DPoP proof as the Pod will…</p>`;
+    }
+    if (!check.ok) {
+      const kind = check.problem.kind === "beyond-solid" ? "warning" : "problem";
+      return callout(kind, describePodTrustProblem(check.problem, this.issuer));
+    }
+    return callout("ready", {
+      summary: "The token and proof pass the Pod's checks",
+      detail: `The app fetched ${this.issuer}'s public keys and checked they signed the token, that it's from ${this.issuer}, is for Solid and hasn't expired. It checked a DPoP proof for a request to your Pod names that request, is tied to this token, and was signed with the key the token is bound to. A Pod makes the same checks on every request.`,
     });
   }
 

@@ -8,6 +8,7 @@ import {
   describeExchangeProblem,
   describeGap,
   describeIssuerProblem,
+  describePodTrustProblem,
   describeProfileGaps,
   describeProfileProblem,
   describeRegistrationProblem,
@@ -16,6 +17,7 @@ import {
   describeWebIdProblem,
   type Message,
 } from "./messages.ts";
+import type { PodTrustProblem } from "./pod-trust-check.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
@@ -302,6 +304,37 @@ describe("describeContainerProblem", () => {
   for (const [problem, summary, detail] of cases) {
     it(`explains ${JSON.stringify(problem)}`, () => {
       const message = describeContainerProblem(problem, url);
+      assertReadable(message);
+      assert.match(message.summary, summary);
+      assert.match(message.detail, detail);
+    });
+  }
+});
+
+describe("describePodTrustProblem", () => {
+  const cases: [PodTrustProblem, RegExp, RegExp][] = [
+    [
+      { kind: "issuer", problem: { kind: "not-json" } },
+      /couldn't find the provider's keys/,
+      /same configuration/,
+    ],
+    [
+      { kind: "keys-unavailable", reason: "No answer." },
+      /couldn't be fetched/,
+      /^No answer\. Without them/,
+    ],
+    [{ kind: "beyond-solid", rule: "typ", message: "x" }, /RFC 9068/, /at\+jwt.+weren't checked/],
+    [{ kind: "beyond-solid", rule: "jti", message: "x" }, /RFC 9068/, /no jti/],
+    [{ kind: "beyond-solid", rule: "sub", message: "x" }, /RFC 9068/, /no sub/],
+    [
+      { kind: "refused", message: "JWT signature verification failed" },
+      /would refuse/,
+      /signature verification failed/,
+    ],
+  ];
+  for (const [problem, summary, detail] of cases) {
+    it(`explains ${JSON.stringify(problem)}`, () => {
+      const message = describePodTrustProblem(problem, "https://id.example");
       assertReadable(message);
       assert.match(message.summary, summary);
       assert.match(message.detail, detail);

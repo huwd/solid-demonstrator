@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
-import { signTestJwt } from "../core/test-support/tokens.ts";
+import { signTestJwt, testJwks } from "../core/test-support/tokens.ts";
 
 // A fictional person and identity provider, answered by Playwright inside
 // the browser (decisions 0003 and 0015). The provider's login page is a
@@ -89,6 +89,9 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
       },
     }),
   );
+  await page.route(`${issuer}/jwks`, async (route) =>
+    route.fulfill({ headers: cors, json: await testJwks() }),
+  );
   await page.route(`${issuer}/auth?*`, (route) => {
     const request = new URL(route.request().url());
     authorization = request;
@@ -111,6 +114,8 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
     const body = {
       access_token: await signTestJwt({
         webid: webId,
+        sub: webId,
+        jti: crypto.randomUUID(),
         aud: "solid",
         client_id: sent?.get("client_id"),
         exp: now + 300,
@@ -199,9 +204,13 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
   await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
-  // back, the exchange, the profile again and the Pod's check, then the Pod.
-  await expect(timeline.getByRole("listitem")).toHaveCount(9);
-  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(1);
+  // back, the exchange, the profile again and the WebID check, the
+  // provider's configuration and keys and the token check, then the Pod.
+  await expect(timeline.getByRole("listitem")).toHaveCount(12);
+  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(2);
+  await expect(page.locator("token-inspector")).toContainText(
+    "The token and proof pass the Pod's checks",
+  );
   await expect(timeline).not.toContainText("one-time-code-0123456789");
 
   const [exchange] = provider.tokenRequests;
@@ -432,14 +441,46 @@ test("warns when the WebID's profile doesn't name the provider", async ({ page }
 test("warns when the access token is bound to another key", async ({ page }) => {
   await serveAlice(page, {
     tokens: {
-      access_token: await signTestJwt({ webid: webId, cnf: { jkt: "someone-elses-key" } }),
+      access_token: await signTestJwt({
+        webid: webId,
+        sub: webId,
+        jti: "token-1",
+        aud: "solid",
+        client_id: "https://app.example/id",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        cnf: { jkt: "someone-elses-key" },
+      }),
     },
   });
   await discoverAlice(page);
   await logIn(page, "Allow");
-  await expect(page.locator("token-inspector").getByRole("alert")).toContainText(
-    "bound to a different key",
+  const alerts = page.locator("token-inspector").getByRole("alert");
+  await expect(alerts.filter({ hasText: "bound to a different key" })).toBeVisible();
+  // Repeating the Pod's checks finds the same fault.
+  await expect(alerts.filter({ hasText: "A Pod would refuse this token" })).toContainText(
+    "confirmation mismatch",
   );
+});
+
+test("says when only RFC 9068, not Solid, would refuse the token", async ({ page }) => {
+  await serveAlice(page, {
+    tokens: {
+      access_token: await signTestJwt({
+        webid: webId,
+        aud: "solid",
+        client_id: "https://app.example/id",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        cnf: { jkt: "any" },
+      }),
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const inspector = page.locator("token-inspector");
+  await expect(
+    inspector.getByText("The token doesn't meet RFC 9068, but Solid doesn't require that"),
+  ).toBeVisible();
+  await expect(inspector).toContainText("the signature and the DPoP proof weren't checked");
 });
 
 test("logs out, forgetting the session, key, stored values and timeline", async ({ page }) => {
