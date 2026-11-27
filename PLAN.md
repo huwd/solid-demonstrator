@@ -51,7 +51,7 @@ Login sends the browser away to the identity provider and back, which reloads th
 
 - The trace, PKCE verifier, `state` and chosen identity provider are kept in session storage for the tab.
 - The DPoP key pair is generated with WebCrypto as non-extractable and kept in IndexedDB, which can store a key object without exposing the private key.
-- Tokens are kept in memory only. Reloading the page after login means logging in again. This is a deliberate trade for a demonstrator, and is worth a decision record.
+- Tokens are kept in memory only. Reloading the page after login means logging in again. This is a deliberate trade for a demonstrator, proposed in [decision 0008](docs/decisions/0008-tokens-in-memory-key-in-indexeddb.md).
 
 On return, the app adds reconstructed entries for the redirect to the identity provider and the redirect back, from what it sent and the query parameters it received.
 
@@ -130,9 +130,11 @@ Each milestone ends with something a person can use, and with its documentation 
 
 ### 0. Set up the repository
 
-- devenv, pnpm, Biome, TypeScript, `node:test`, markdownlint and Vale, matching solid-oidc.
+- devenv, pnpm, markdownlint and Vale, matching solid-oidc, with Vale errors failing the build ([0007](docs/decisions/0007-toolchain.md)).
 - CI that runs the checks, with read-only workflows and pinned actions.
-- Decision records for the approach (hand-built flow), the toolchain and the interface library.
+- Decision records for the choices made in planning ([0000](docs/decisions/0000-record-decisions.md) to [0009](docs/decisions/0009-client-id-documents-only.md)).
+
+Biome, TypeScript and `node:test` join the checks with the first code, in milestone 1.
 
 ### 1. Discovery, with the trace and timeline
 
@@ -195,15 +197,21 @@ Outcome 11's export, and outcome 13.
 - The tour: a journey for a fictional person, replayed through the same steps and views as a live session. See [The tour](#the-tour).
 - The sign-up link to public providers, and the explanation for someone who enters a WebID they can't log in as. Both are small enough to ship earlier, with milestone 2.
 
-## Decisions to record
+## Decisions
 
-- Building the flow by hand instead of using a Solid login library.
-- Keeping tokens in memory only, and the DPoP key as non-extractable in IndexedDB.
-- The interface library.
-- The redaction rules, and why DPoP proofs are shown in full.
-- The provenance labels, and the rule that explained entries are never presented as logs.
-- Supporting Client ID Documents only, unless dynamic client registration is added.
-- Building the tour from recordings of the real steps against fictional servers, rather than a separately scripted demo.
+[`docs/decisions/`](docs/decisions/README.md) records the decisions this plan rests on. Check a change against the accepted records before making it.
+
+Still proposed, and to settle before the milestone that depends on them:
+
+- [0006](docs/decisions/0006-tour-from-recorded-journeys.md): building the tour from recordings, before milestone 7
+- [0008](docs/decisions/0008-tokens-in-memory-key-in-indexeddb.md): tokens in memory and the DPoP key in IndexedDB, before milestone 2
+- [0009](docs/decisions/0009-client-id-documents-only.md): Client ID Documents only, before milestone 2
+
+Still to record:
+
+- the low-level OAuth library and other dependencies, in milestone 1
+- the interface library, in milestone 1
+- the bundler and browser test tool, in milestone 1
 
 ## Risks
 
