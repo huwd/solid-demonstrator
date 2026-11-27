@@ -172,6 +172,9 @@ importers:
       n3:
         specifier: 2.13.12
         version: 2.13.12
+      oauth4webapi:
+        specifier: 3.8.9
+        version: 3.8.9
     devDependencies:
       '@biomejs/biome':
         specifier: 2.6.9
@@ -923,6 +926,9 @@ packages:
     resolution: {integrity: sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
+
+  oauth4webapi@3.8.9:
+    resolution: {integrity: sha512-gyn4jpaxyYFm1epl3mwqc1sFShLjT9eq/63JW+Nvk286Lz6FC72pVv/SyhJHxo+sQiHEcjIHs4TtFKX/+Md07A==}
 
   parse-entities@4.0.2:
     resolution: {integrity: sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==}
@@ -1747,6 +1753,8 @@ snapshots:
       readable-stream: 4.8.0
 
   nanoid@3.3.20: {}
+
+  oauth4webapi@3.8.9: {}
 
   parse-entities@4.0.2:
     dependencies:

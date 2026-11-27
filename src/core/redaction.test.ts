@@ -199,6 +199,18 @@ describe("redactRequest", () => {
     );
   });
 
+  it("shortens the PKCE challenge, state and nonce in an authorization request", () => {
+    const { value } = redactRequest(
+      request({
+        url: "https://id.example/auth?response_type=code&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj",
+      }),
+    );
+    assert.equal(
+      value.url,
+      "https://id.example/auth?response_type=code&code_challenge=E9Melh… (43 characters)&state=af0ifj… (11 characters)&nonce=n-0S6_… (12 characters)",
+    );
+  });
+
   it("redacts tokens returned in a URL fragment, keeping the query", () => {
     const { value, decodedTokens } = redactRequest(
       request({
