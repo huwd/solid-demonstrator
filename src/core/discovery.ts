@@ -19,7 +19,13 @@ export interface ProviderFinding {
 
 export type DiscoveryResult =
   | { readonly ok: false; readonly stage: "webid"; readonly problem: WebIdProblem }
-  | { readonly ok: false; readonly stage: "profile"; readonly problem: ProfileProblem }
+  | {
+      readonly ok: false;
+      readonly stage: "profile";
+      /** The profile document that was asked for, which messages name. */
+      readonly document: URL;
+      readonly problem: ProfileProblem;
+    }
   | {
       readonly ok: true;
       readonly profile: WebIdProfile;
@@ -39,7 +45,12 @@ export async function discover(typed: string, options: DiscoveryOptions): Promis
   }
   const profileResult = await fetchWebIdProfile(options.tracedFetch, input, options.trace);
   if (!profileResult.ok) {
-    return { ok: false, stage: "profile", problem: profileResult.problem };
+    return {
+      ok: false,
+      stage: "profile",
+      document: input.profileDocument,
+      problem: profileResult.problem,
+    };
   }
   const { profile } = profileResult;
   // Providers are independent of each other, so they are asked at once.
