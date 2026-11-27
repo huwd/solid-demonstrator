@@ -452,6 +452,8 @@ export class DemonstratorApp extends LitElement {
           .podFetch=${state.podFetch}
           .trace=${this.#trace}
           .root=${state.storage}
+          .webId=${state.inspection?.accessToken?.webId ?? session.webId}
+          .clientId=${state.inspection?.accessToken?.clientId ?? null}
         ></pod-browser>
         <h2>Log out</h2>
         <p>

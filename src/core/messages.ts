@@ -12,6 +12,7 @@ import type { IssuerGap, IssuerProblem } from "./issuer.ts";
 import type { ReturnProblem } from "./login-return.ts";
 import type { ReadProblem, TurtleProblem } from "./pod-read.ts";
 import type { BeyondSolidRule, PodTrustProblem } from "./pod-trust-check.ts";
+import type { WriteProblem } from "./pod-write.ts";
 import type { ProfileProblem, WebIdProfile } from "./profile.ts";
 import type { RegistrationProblem } from "./registration.ts";
 import type { ExchangeProblem } from "./token-exchange.ts";
@@ -518,6 +519,37 @@ export function describeAccessRulesProblem(problem: AccessRulesProblem, url: URL
       return {
         summary: "The access rules couldn't be read",
         detail: `They aren't valid Turtle: ${problem.message}`,
+      };
+    default:
+      return describeReadProblem(problem, url);
+  }
+}
+
+/** Why the Pod didn't make a change. */
+export function describeWriteProblem(problem: WriteProblem, url: URL): Message {
+  switch (problem.kind) {
+    case "changed":
+      return {
+        summary: "Someone changed this since you opened it",
+        detail:
+          "The Pod answered 412. The app asked it to save only if the resource was still the version you opened, named by its ETag, and it isn't. Nothing was overwritten. Open it again to see the newer version.",
+      };
+    case "exists":
+      return {
+        summary: "Something is already at this address",
+        detail: `The Pod answered 412. The app asked it to create ${url.href} only if nothing was there, so nothing was replaced. Choose another name.`,
+      };
+    case "not-empty":
+      return {
+        summary: "The folder isn't empty",
+        detail:
+          "The Pod answered 409: it won't delete a folder that still holds something. Delete what's inside first.",
+      };
+    case "forbidden":
+      return {
+        summary: "You aren't allowed to change this",
+        detail:
+          "The Pod answered 403. It knows who you are, but its access rules don't let you, or this app, make this change.",
       };
     default:
       return describeReadProblem(problem, url);

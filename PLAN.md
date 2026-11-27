@@ -181,6 +181,8 @@ Outcomes 5 (reading), 6 and 7.
 Outcome 5 (writing).
 
 - Create, edit and delete, with `If-Match` on edits so the Pod refuses a write that would overwrite a newer change.
+- Writing into a `solid-demonstrator/` scratch folder by default, with a switch, off after each login, for changes elsewhere, and confirmation before every delete ([decision 0017](docs/decisions/0017-write-to-a-scratch-folder-by-default.md)).
+- Example ACP and WAC rules that narrow the app's access to the scratch folder, for the person to apply in their Pod.
 
 ### 5. Notifications
 

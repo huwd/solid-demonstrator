@@ -75,3 +75,4 @@ Editorial improvements, such as clearer wording, typo corrections and link fixes
 | [0014](0014-oauth4webapi-for-oauth-steps.md) | Use oauth4webapi for PKCE, DPoP and token requests, through the traced fetch | Accepted |
 | [0015](0015-test-against-fictional-and-live-servers.md) | Test against fictional and live servers, without a local stack for now | Accepted |
 | [0016](0016-oauth4webapi-for-the-pods-checks.md) | Use oauth4webapi to repeat the Pod's checks of the token and DPoP proof | Accepted |
+| [0017](0017-write-to-a-scratch-folder-by-default.md) | Write to a scratch folder by default, and show how to narrow the app's access | Accepted |

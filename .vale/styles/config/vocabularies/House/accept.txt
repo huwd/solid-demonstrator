@@ -15,6 +15,7 @@ Lit('s)?
 (?i)loopback
 maintainer's
 markdownlint
+[Mm]atchers?
 nixpkgs
 Nygard('s)?
 OAuth

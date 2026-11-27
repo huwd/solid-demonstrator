@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
 import { signTestJwt, testJwks } from "../core/test-support/tokens.ts";
+import {
+  type Answer,
+  type FictionalPod,
+  pod,
+  serveFictionalPod,
+  storageDescription,
+} from "./test-support/fictional-pod.ts";
 
 // A fictional person and identity provider, answered by Playwright inside
 // the browser (decisions 0003 and 0015). The provider's login page is a
@@ -17,6 +24,7 @@ interface Provider {
   readonly tokenRequests: readonly Request[];
   /** The requests the Pod accepted. */
   readonly podRequests: readonly Request[];
+  readonly pod: FictionalPod;
 }
 
 interface Options {
@@ -27,25 +35,12 @@ interface Options {
   readonly tokenStatus?: number;
   /** The profile from the second fetch on, when the app checks the token's WebID. */
   readonly profileAfterLogin?: string;
-  /** The Pod's containers, by URL, as Turtle; each defaults to an empty container. */
-  readonly pod?: Record<
-    string,
-    {
-      readonly status?: number;
-      readonly body?: string;
-      readonly wacAllow?: string;
-      readonly contentType?: string;
-      readonly etag?: string;
-      /** The Link header; by default, the storage description's, and the root's type. */
-      readonly link?: string;
-    }
-  >;
+  /** What the fictional Pod holds, by URL. */
+  readonly pod?: Readonly<Record<string, Answer>>;
   /** The storage description, as Turtle; by default, one WebSocket subscription service. */
   readonly storageDescription?: string;
 }
 
-const pod = "https://pod.example/alice/";
-const storageDescription = "https://pod.example/.well-known/solid";
 const profile = `<#me> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${issuer}> ;
   <http://www.w3.org/ns/pim/space#storage> <${pod}> .`;
 
@@ -67,7 +62,6 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
   const answer = options.answer ?? answerWithCode;
   let authorization: URL | null = null;
   const tokenRequests: Request[] = [];
-  const podRequests: Request[] = [];
   let profileFetches = 0;
   await page.route(alice, (route) => {
     profileFetches += 1;
@@ -140,48 +134,13 @@ async function serveAlice(page: Page, options: Options = {}): Promise<Provider> 
     };
     return route.fulfill({ status: options.tokenStatus ?? 200, headers: cors, json: body });
   });
-  await page.route(`${pod}**`, (route) => {
-    const request = route.request();
-    const headers = request.headers();
-    // A Pod refuses a request without a DPoP-bound token and a proof.
-    if (!headers["authorization"]?.startsWith("DPoP ") || headers["dpop"] === undefined) {
-      return route.fulfill({ status: 401, headers: cors, body: "" });
-    }
-    podRequests.push(request);
-    const answer = options.pod?.[request.url()] ?? {};
-    return route.fulfill({
-      status: answer.status ?? 200,
-      headers: {
-        ...cors,
-        "content-type": "text/turtle",
-        // The browser hides these from the app unless the Pod exposes them, as real Pods do.
-        "access-control-expose-headers": "WAC-Allow, ETag, Link",
-        link:
-          answer.link ??
-          [
-            `<${storageDescription}>; rel="http://www.w3.org/ns/solid/terms#storageDescription"`,
-            ...(request.url() === pod
-              ? ['<http://www.w3.org/ns/pim/space#Storage>; rel="type"']
-              : []),
-          ].join(", "),
-        ...(answer.contentType === undefined ? {} : { "content-type": answer.contentType }),
-        ...(answer.etag === undefined ? {} : { etag: answer.etag }),
-        ...(answer.wacAllow === undefined ? {} : { "wac-allow": answer.wacAllow }),
-      },
-      body: answer.body ?? "<> a <http://www.w3.org/ns/ldp#BasicContainer> .",
-    });
-  });
-  await page.route(storageDescription, (route) =>
-    route.fulfill({
-      headers: { ...cors, "content-type": "text/turtle" },
-      body:
-        options.storageDescription ??
-        `@prefix notify: <http://www.w3.org/ns/solid/notifications#> .
-        <> notify:subscription </.notifications/WebSocketChannel2023/> .
-        </.notifications/WebSocketChannel2023/> notify:channelType notify:WebSocketChannel2023 .`,
-    }),
-  );
-  return { authorization: () => authorization, tokenRequests, podRequests };
+  const fictionalPod = await serveFictionalPod(page, options.pod, options.storageDescription);
+  return {
+    authorization: () => authorization,
+    tokenRequests,
+    podRequests: fictionalPod.requests,
+    pod: fictionalPod,
+  };
 }
 
 const webId = `${alice}#me`;
@@ -565,7 +524,7 @@ test("browses the Pod as the logged-in person, a folder at a time", async ({ pag
   await logIn(page, "Allow");
 
   const browser = page.locator("pod-browser");
-  await expect(browser.getByRole("heading", { name: "Your Pod" })).toBeVisible();
+  await expect(browser.getByRole("heading", { name: "Your Pod", exact: true })).toBeVisible();
   const offers = browser.getByRole("region", { name: "What this Pod offers" });
   await expect(offers).toContainText(`The Pod describes its storage at ${storageDescription}.`);
   await expect(offers).toContainText(
@@ -729,4 +688,109 @@ test("explains why the access rules aren't shown", async ({ page }) => {
   await expect(browser.getByRole("alert")).toContainText(
     "Only someone with Control access may see these rules",
   );
+});
+
+const scratch = `${pod}solid-demonstrator/`;
+
+test("creates, edits and deletes in the scratch folder, each with its condition", async ({
+  page,
+}) => {
+  const provider = await serveAlice(page);
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+
+  await browser.getByRole("button", { name: "Use the scratch folder" }).click();
+  await expect(browser).toContainText(`The app created ${scratch}`);
+  await expect(browser.getByRole("navigation", { name: "Where you are" })).toContainText(
+    "solid-demonstrator",
+  );
+
+  const create = browser.getByRole("form", { name: "Create" });
+  await create.getByLabel("Name").fill("note.txt");
+  await create.getByLabel("Kind").selectOption("text/plain");
+  await create.getByLabel("Content").fill("Buy milk");
+  await create.getByRole("button", { name: "Create" }).click();
+  await expect(browser.getByRole("button", { name: "note.txt" })).toBeVisible();
+  expect(provider.pod.holds(`${scratch}note.txt`)?.body).toBe("Buy milk");
+
+  await browser.getByRole("button", { name: "note.txt" }).click();
+  await browser.getByRole("button", { name: "Edit" }).click();
+  const edit = browser.getByRole("form", { name: "Edit" });
+  await edit.getByLabel("Content").fill("Buy oat milk");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(browser.getByLabel("Content of note.txt")).toHaveText("Buy oat milk");
+
+  await browser.getByRole("button", { name: "Delete", exact: true }).click();
+  await browser
+    .getByRole("alertdialog", { name: "Confirm delete" })
+    .getByRole("button", { name: "Yes, delete it" })
+    .click();
+  await expect(browser.getByText("This folder is empty.")).toBeVisible();
+  expect(provider.pod.holds(`${scratch}note.txt`)).toBeUndefined();
+
+  const writes = provider.podRequests.filter((request) => request.method() !== "GET");
+  expect(
+    writes.map((request) => [
+      request.method(),
+      request.url(),
+      request.headers()["if-none-match"] ?? request.headers()["if-match"] ?? null,
+    ]),
+  ).toEqual([
+    ["PUT", scratch, "*"],
+    ["PUT", `${scratch}note.txt`, "*"],
+    ["PUT", `${scratch}note.txt`, '"v2"'],
+    ["DELETE", `${scratch}note.txt`, '"v3"'],
+  ]);
+});
+
+test("refuses an edit when someone else changed the file first", async ({ page }) => {
+  const note = `${scratch}note.txt`;
+  const provider = await serveAlice(page, {
+    pod: { [note]: { contentType: "text/plain", body: "Mine", etag: '"v0"' } },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await browser.getByRole("button", { name: "Use the scratch folder" }).click();
+  await expect(browser).toContainText(`The app found ${scratch}`);
+
+  await browser.getByRole("button", { name: "note.txt" }).click();
+  await browser.getByRole("button", { name: "Edit" }).click();
+  provider.pod.change(note, "Theirs");
+  const edit = browser.getByRole("form", { name: "Edit" });
+  await edit.getByLabel("Content").fill("Mine, changed");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(browser.getByRole("alert")).toContainText(
+    "Someone changed this since you opened it",
+  );
+  expect(provider.pod.holds(note)?.body).toBe("Theirs");
+});
+
+test("changes nothing outside the scratch folder until allowed to", async ({ page, baseURL }) => {
+  await serveAlice(page, {
+    pod: {
+      [pod]: {
+        body: `<> a <http://www.w3.org/ns/ldp#BasicContainer> ; <http://www.w3.org/ns/ldp#contains> <hello.txt> .`,
+      },
+      [`${pod}hello.txt`]: { contentType: "text/plain", body: "Hello", etag: '"v0"' },
+    },
+  });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  await expect(browser.getByRole("form", { name: "Create" })).toHaveCount(0);
+
+  await browser.getByRole("button", { name: "hello.txt" }).click();
+  await expect(browser).toContainText("This is outside the scratch folder");
+  await expect(browser.getByRole("button", { name: "Edit" })).toHaveCount(0);
+
+  await browser.getByLabel("Allow changes outside the scratch folder").check();
+  await expect(browser.getByRole("button", { name: "Edit" })).toBeVisible();
+
+  await browser.getByText("Narrow this app's access in your Pod").click();
+  await expect(browser.getByLabel("Example ACP rules")).toContainText(
+    `acp:client <${baseURL}/clientid.jsonld>`,
+  );
+  await expect(browser.getByLabel("Example WAC rules")).toContainText(`acl:origin <${baseURL}>`);
 });
