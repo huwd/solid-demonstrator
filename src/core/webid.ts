@@ -50,7 +50,11 @@ export function readWebId(typed: string): WebIdInput {
 
 const loopbackHosts: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-function isAllowedScheme(url: URL): boolean {
+/**
+ * Whether the demonstrator may fetch a URL: HTTPS, or HTTP on a loopback
+ * host for a local test stack.
+ */
+export function isAllowedScheme(url: URL): boolean {
   if (url.protocol === "https:") {
     return true;
   }

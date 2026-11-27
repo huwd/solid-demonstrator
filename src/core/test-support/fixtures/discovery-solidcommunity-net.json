@@ -1,0 +1,50 @@
+{
+  "authorization_endpoint": "https://solidcommunity.net/.oidc/auth",
+  "authorization_response_iss_parameter_supported": true,
+  "claim_types_supported": ["normal"],
+  "claims_parameter_supported": true,
+  "claims_supported": ["azp", "sub", "webid", "sid", "auth_time", "iss"],
+  "code_challenge_methods_supported": ["S256"],
+  "dpop_signing_alg_values_supported": [
+    "RS256",
+    "RS384",
+    "RS512",
+    "PS256",
+    "PS384",
+    "PS512",
+    "ES256",
+    "ES256K",
+    "ES384",
+    "ES512",
+    "EdDSA"
+  ],
+  "end_session_endpoint": "https://solidcommunity.net/.oidc/session/end",
+  "grant_types_supported": [
+    "implicit",
+    "authorization_code",
+    "refresh_token",
+    "client_credentials"
+  ],
+  "id_token_signing_alg_values_supported": ["ES256"],
+  "introspection_endpoint": "https://solidcommunity.net/.oidc/token/introspection",
+  "issuer": "https://solidcommunity.net/",
+  "jwks_uri": "https://solidcommunity.net/.oidc/jwks",
+  "pushed_authorization_request_endpoint": "https://solidcommunity.net/.oidc/request",
+  "registration_endpoint": "https://solidcommunity.net/.oidc/reg",
+  "request_parameter_supported": false,
+  "request_uri_parameter_supported": false,
+  "response_modes_supported": ["form_post", "fragment", "query"],
+  "response_types_supported": ["code id_token", "code", "id_token", "none"],
+  "revocation_endpoint": "https://solidcommunity.net/.oidc/token/revocation",
+  "scopes_supported": ["openid", "profile", "offline_access", "webid"],
+  "subject_types_supported": ["public"],
+  "token_endpoint": "https://solidcommunity.net/.oidc/token",
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_jwt",
+    "client_secret_post",
+    "private_key_jwt",
+    "none"
+  ],
+  "token_endpoint_auth_signing_alg_values_supported": ["HS256", "RS256", "PS256", "ES256", "EdDSA"]
+}
