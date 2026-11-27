@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing } from "lit";
 import { type Choice, choose, initialChoice } from "../core/choice.ts";
-import { clientIdDocumentPath } from "../core/client-id.ts";
+import { clientIdDocumentPath, clientMetadata } from "../core/client-id.ts";
 import { type DiscoveryResult, discover } from "../core/discovery.ts";
 import type { IssuerConfiguration } from "../core/issuer.ts";
 import { generateDpopKeyPair, type PendingLogin, prepareLogin } from "../core/login.ts";
@@ -8,10 +8,12 @@ import { isLoginReturn, returnFromLogin } from "../core/login-return.ts";
 import { type SavedLogin, saveLogin, takeLogin } from "../core/login-storage.ts";
 import {
   describeExchangeProblem,
+  describeRegistrationProblem,
   describeReturnProblem,
   describeWebIdProblem,
   type Message,
 } from "../core/messages.ts";
+import { registerClient } from "../core/registration.ts";
 import { exchangeCode, type Session } from "../core/token-exchange.ts";
 import { type Inspection, inspectSession } from "../core/token-inspection.ts";
 import { checkTokenWebId, type WebIdCheckResult } from "../core/token-webid-check.ts";
@@ -32,6 +34,8 @@ type State =
       readonly choice: Choice;
       /** Why the app couldn't send the person to log in, if it couldn't. */
       readonly loginProblem: Message | null;
+      /** True while the app registers with the provider, before sending the person there. */
+      readonly registering: boolean;
     }
   | { readonly kind: "leaving"; readonly issuer: string }
   | { readonly kind: "exchanging"; readonly issuer: string }
@@ -281,6 +285,7 @@ export class DemonstratorApp extends LitElement {
       result,
       choice: result.ok ? initialChoice(result) : { issuer: null, storage: null },
       loginProblem: null,
+      registering: false,
     };
   };
 
@@ -289,17 +294,32 @@ export class DemonstratorApp extends LitElement {
     if (configuration === null) {
       return nothing;
     }
-    if (!configuration.clientIdDocuments) {
-      return html`
-        <h2>Log in</h2>
-        <p>
-          ${configuration.issuer} doesn't read Client ID Documents, so the app would have to register
-          with it first. Logging in with registration arrives in a later version.
-        </p>
-      `;
-    }
+    const site = siteUrl();
+    const document = new URL(clientIdDocumentPath, site);
     return html`
       <h2>Log in</h2>
+      ${
+        configuration.clientIdDocuments || configuration.registrationEndpoint === null
+          ? html`<p>
+              The app will identify itself with its
+              <a href=${document.href}>Client ID Document</a>, published beside it at
+              ${document.href}. ${configuration.issuer} fetches the document itself, so it can check
+              the app is served from where it says, and sends you back only to an address the
+              document lists.
+              ${
+                configuration.clientIdDocuments
+                  ? nothing
+                  : html`${configuration.issuer} doesn't say it reads Client ID Documents or offers
+                    registration, so the app will try its document anyway.`
+              }
+            </p>`
+          : html`<p>
+              ${configuration.issuer} doesn't read Client ID Documents, so the app will first
+              register itself, with dynamic client registration, and be given a client_id. The
+              provider can't check what a registration says, since any page could send the same
+              request, so a registered name is only what the app claims.
+            </p>`
+      }
       <p>
         The app will send you to ${configuration.issuer} to log in. The app can't see what happens
         there: the provider checks who you are, then asks whether to let the app act for you. Either
@@ -313,9 +333,14 @@ export class DemonstratorApp extends LitElement {
               <p>${state.loginProblem.detail}</p>
             </div>`
       }
-      <button type="button" @click=${() => this.#logIn(state, configuration)}>
+      <button
+        type="button"
+        ?disabled=${state.registering}
+        @click=${() => this.#logIn(state, configuration)}
+      >
         Log in with ${configuration.issuer}
       </button>
+      <p role="status">${state.registering ? `Registering with ${configuration.issuer}…` : ""}</p>
     `;
   }
 
@@ -366,18 +391,34 @@ export class DemonstratorApp extends LitElement {
   }
 
   async #logIn(state: State & { kind: "done" }, configuration: IssuerConfiguration): Promise<void> {
-    // The start page is the redirect address the Client ID Document lists.
-    const site = new URL("./", new URL(location.pathname, location.origin));
-    const prepared = await prepareLogin(configuration, {
-      clientId: new URL(clientIdDocumentPath, site).href,
-      redirectUri: site.href,
-    });
+    const site = siteUrl();
+    let clientId = new URL(clientIdDocumentPath, site).href;
+    if (!configuration.clientIdDocuments && configuration.registrationEndpoint !== null) {
+      this.state = { ...state, loginProblem: null, registering: true };
+      const registration = await registerClient(
+        this.#tracedFetch,
+        configuration.registrationEndpoint,
+        clientMetadata(site),
+        this.#trace,
+      );
+      if (!registration.ok) {
+        this.state = {
+          ...state,
+          registering: false,
+          loginProblem: describeRegistrationProblem(registration.problem, configuration.issuer),
+        };
+        return;
+      }
+      clientId = registration.clientId;
+    }
+    const prepared = await prepareLogin(configuration, { clientId, redirectUri: site.href });
     const saved: SavedLogin = { pending: prepared.pending, entries: this.#trace.entries() };
     try {
       saveLogin(sessionStorage, saved);
     } catch {
       this.state = {
         ...state,
+        registering: false,
         loginProblem: {
           summary: "The browser wouldn't let the app keep what the login needs",
           detail:
@@ -407,6 +448,14 @@ function chosenConfiguration(state: State & { kind: "done" }): IssuerConfigurati
   const issuer = state.choice.issuer;
   const finding = state.result.providers.find((provider) => provider.issuer === issuer);
   return finding?.result.ok === true ? finding.result.configuration : null;
+}
+
+/**
+ * Where the app is served from: the start page, which is the redirect
+ * address the Client ID Document lists, and the one a registration sends.
+ */
+function siteUrl(): URL {
+  return new URL("./", new URL(location.pathname, location.origin));
 }
 
 /**
