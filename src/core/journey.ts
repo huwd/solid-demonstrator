@@ -55,10 +55,10 @@ const chapterOfStep: Readonly<Record<string, Chapter>> = {
 };
 
 const chapterTitles: Readonly<Record<Chapter, string>> = {
-  discovery: "Discovery",
-  login: "Login",
+  discovery: "Finding the servers",
+  login: "Logging in",
   pod: "Reading and writing",
-  notifications: "Notifications",
+  notifications: "Watching for changes",
 };
 
 /** One exchange, or one step known some other way, as the pictures draw it. */

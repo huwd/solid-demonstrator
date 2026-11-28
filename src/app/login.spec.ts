@@ -184,14 +184,14 @@ test("logs the person in, through their provider, with a DPoP-bound token", asyn
   });
 
   const timeline = page.locator("trace-timeline");
-  await expect(timeline.getByText("Reconstructed", { exact: true })).toHaveCount(2);
-  await expect(timeline.getByText("Explained, not observed", { exact: true })).toHaveCount(1);
+  await expect(timeline.getByText("Pieced together", { exact: true })).toHaveCount(2);
+  await expect(timeline.getByText("Happens out of sight", { exact: true })).toHaveCount(1);
   // The profile and the provider before the redirect, the trip there and
   // back, the exchange, the profile again and the WebID check, the
   // provider's configuration and keys and the token check, then the Pod's
   // root and its storage description.
   await expect(timeline.getByRole("listitem")).toHaveCount(13);
-  await expect(timeline.getByText("Repeated", { exact: true })).toHaveCount(2);
+  await expect(timeline.getByText("Checked again here", { exact: true })).toHaveCount(2);
   await expect(page.locator("token-inspector")).toContainText(
     "The token and proof pass the Pod's checks",
   );

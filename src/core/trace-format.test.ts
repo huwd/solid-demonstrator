@@ -36,7 +36,7 @@ describe("provenanceLabel", () => {
 
   it("never lets an explained entry pass for a log", () => {
     const { label, meaning } = provenanceLabel("explained");
-    assert.match(label, /not observed/);
+    assert.match(label, /out of sight/);
     assert.match(meaning, /isn't a log/);
   });
 

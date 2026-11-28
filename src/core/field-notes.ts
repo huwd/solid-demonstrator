@@ -27,7 +27,7 @@ const headerNotes: Readonly<Record<string, string>> = {
 const fieldNotes: Readonly<Record<string, string>> = {
   client_id:
     "Which app is asking: the address of its Client ID Document, or an identifier from registration.",
-  code: "The one-time code from the sign-in, shortened. It's secret until it's spent.",
+  code: "The one-time code from the login, shortened. It's secret until it's spent.",
   code_challenge:
     "A hash of a secret only this app holds, which the provider checks when the code is spent (PKCE).",
   code_challenge_method: "How the challenge was hashed.",
