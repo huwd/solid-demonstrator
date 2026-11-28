@@ -52,16 +52,22 @@ test("lists every exchange in order, labelled with how it's known", async ({ pag
   await expect(entries.nth(0)).toContainText("As expected");
 });
 
-test("opens an entry to show the request and response", async ({ page }) => {
+test("opens an entry to show the request and response, with what each part is for", async ({
+  page,
+}) => {
   await discoverAlice(page);
 
-  const first = page.locator("trace-timeline li").first();
-  await first.locator("summary").click();
-  await expect(first).toContainText(`GET ${alice}`);
-  await expect(first).toContainText("accept: text/turtle");
-  await expect(first).toContainText("200 OK");
-  await expect(first).toContainText("solid:oidcIssuer <https://id.example>");
-  await expect(first.getByRole("link", { name: "The specification for this step" })).toBeVisible();
+  await page.locator("trace-timeline li").first().getByRole("button").click();
+  const detail = page
+    .locator("trace-timeline")
+    .getByRole("complementary", { name: "The selected step" });
+  await expect(detail).toContainText(`GET ${alice}`);
+  await expect(detail).toContainText("accept: text/turtle");
+  await expect(detail).toContainText("The formats the app will take, best first.");
+  await expect(detail).toContainText("200 OK");
+  await expect(detail).toContainText("solid:oidcIssuer <https://id.example>");
+  await expect(detail.getByRole("link", { name: "The specification for this step" })).toBeVisible();
+  await expect(page.locator("trace-timeline li").first()).toHaveAttribute("aria-current", "step");
 });
 
 test("marks the exchange that wasn't as expected, saying why", async ({ page }) => {
@@ -70,7 +76,46 @@ test("marks the exchange that wasn't as expected, saying why", async ({ page }) 
   const gone = page.locator("trace-timeline li.unexpected");
   await expect(gone).toHaveCount(1);
   await expect(gone).toContainText("Not as expected");
-  await gone.locator("summary").click();
-  await expect(gone).toContainText("Expected 200 OK. Got 404");
-  await expect(gone).toContainText("GET https://gone.example/.well-known/openid-configuration");
+  await gone.getByRole("button").click();
+  const detail = page
+    .locator("trace-timeline")
+    .getByRole("complementary", { name: "The selected step" });
+  await expect(detail).toContainText("Expected 200 OK. Got 404");
+  await expect(detail).toContainText("GET https://gone.example/.well-known/openid-configuration");
+});
+
+test("follows the newest step, and steps back and forth through the journey", async ({ page }) => {
+  await discoverAlice(page);
+
+  const timeline = page.locator("trace-timeline");
+  const controls = timeline.getByRole("group", { name: "Step through the journey" });
+  await expect(controls).toContainText("Step 3 of 3");
+  await expect(controls.getByRole("checkbox", { name: "Follow new steps" })).toBeChecked();
+  await expect(controls.getByRole("button", { name: "Next step" })).toBeDisabled();
+
+  await controls.getByRole("button", { name: "Previous step" }).click();
+  await expect(controls).toContainText("Step 2 of 3");
+  await expect(controls.getByRole("checkbox", { name: "Follow new steps" })).not.toBeChecked();
+  await expect(timeline.locator("li").nth(1)).toHaveAttribute("aria-current", "step");
+
+  await controls.getByRole("checkbox", { name: "Follow new steps" }).check();
+  await expect(controls).toContainText("Step 3 of 3");
+});
+
+test("groups the steps into chapters, and maps the parties found", async ({ page }) => {
+  await discoverAlice(page);
+
+  const timeline = page.locator("trace-timeline");
+  const discovery = timeline.getByRole("region", { name: "Discovery" });
+  await expect(discovery).toContainText("3 steps. 1 went other than expected.");
+  const map = timeline.locator("journey-map");
+  await expect(map).toContainText("Found so far: your WebID profile and 2 identity providers.");
+  await expect(map.getByRole("img")).toHaveAttribute("aria-label", /2 identity providers/);
+  await expect(map.locator('[data-party="pod"]')).toHaveClass(/expected/);
+
+  // Clicking a line on the map moves the cursor to its latest step.
+  await map.locator('[data-line="app>webid-profile:seen"] .hit').click({ force: true });
+  await expect(timeline.getByRole("group", { name: "Step through the journey" })).toContainText(
+    "Step 1 of 3",
+  );
 });

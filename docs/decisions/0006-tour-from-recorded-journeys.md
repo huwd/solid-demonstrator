@@ -1,6 +1,6 @@
 # 0006. Build the tour from recordings of the real steps against fictional servers
 
-- **Status:** Accepted
+- **Status:** Superseded by [0020](0020-introduce-solid-with-a-scripted-journey.md)
 - **Decided by:** @huwd
 - **Decided:** 2026-11-27
 - **Recorded:** 2026-11-27

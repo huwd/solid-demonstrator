@@ -96,15 +96,15 @@ The traced `fetch` classifies each failure:
 - **Protocol mismatches:** a missing `solid:oidcIssuer`, an `iss` or `state` that doesn't match, an identity provider that accepts neither a Client ID Document nor dynamic registration.
 - **Blocked or unreachable:** the browser raises the same error for a CORS refusal, a DNS failure or a refused connection, and hides which. The app then repeats the request with `mode: "no-cors"`. If that gets an opaque response, the server is reachable and the likely cause is CORS. The diagnosis is labelled as a diagnosis.
 
-### The tour
+### The introduction
 
-The tour (outcome 13) runs the real steps with a different `fetch`: one that answers from a recorded journey instead of the network. The steps, trace, redaction and views are the same code as a live session, so the tour can't show behaviour the live app doesn't have.
+The start page opens with a scripted journey (outcome 13), showing how Solid is expected to work for a fictional person, Alice, on fictional servers ([decision 0020](docs/decisions/0020-introduce-solid-with-a-scripted-journey.md)).
 
-- The recorded journey is captured by running the live app as a fictional person on fictional servers. Where it's captured from is open: [decision 0015](docs/decisions/0015-test-against-fictional-and-live-servers.md) leaves out the local stack this was planned to use. A script captures it again whenever the steps or server versions change.
-- Redaction runs on the recording before it is saved, as on any trace. The recording holds only fictional identities and test keys, so it holds nothing sensitive even before redaction.
-- The redirects to the identity provider are replaced by a short explained interlude, since there is no real login page to visit.
-- The tour includes a refusal: a second fictional WebID that the Pod refuses with `403`.
-- A tour banner and a distinct style mark every tour screen.
+- A script in `src/core` holds its chapters: how the parties fit together, discovery, login, reading and writing, notifications, and a refusal. Each has narration and the exchanges it shows, with an example request and response, a note on each field, and the specification.
+- The script is drawn by the same map, timeline and detail components as a live session. Its entries are a type of their own, never trace entries, and every part of it is labelled as an example.
+- A person steps through it or plays it. The map adds parties and animates each exchange, then the parties move into the timeline's lanes, and each exchange opens in the detail panel.
+- It ends with "Try it yourself", where the person's own WebID runs the real flow through the same views.
+- Two tests keep the script true: its steps must match, in order, those of the live flow against the fictional servers, and every example must pass through the redaction module unchanged.
 
 ### Dependencies
 
@@ -209,13 +209,13 @@ Every picture has a text equivalent that a screen reader can follow. Animation i
 
 Sketches of each picture are agreed with the maintainer before they're built. The pictures are a map of the parties, a sequence timeline and a detail panel, driven by one cursor ([decision 0018](docs/decisions/0018-show-the-journey-as-a-map-timeline-and-detail.md)), drawn as SVG by Lit components with a layout of the app's own ([decision 0019](docs/decisions/0019-draw-the-pictures-as-svg-in-lit.md)).
 
-### 7. Sharing and the tour
+### 7. The introduction, and trying it yourself
 
-Outcome 11's export, and outcome 13.
+Outcome 13, and outcome 11's export.
 
-- Exporting a redacted trace.
-- The tour: a journey for a fictional person, replayed through the same steps and views as a live session. See [The tour](#the-tour).
-- The sign-up link to public providers, and the explanation for someone who enters a WebID they can't log in as. Both are small enough to ship earlier, with milestone 2.
+- The scripted journey on the start page, drawn with milestone 6's views. See [The introduction](#the-introduction).
+- "Try it yourself" at its end: the WebID box, the sign-up link to public providers, and the explanation for someone who enters a WebID they can't log in as.
+- Exporting a redacted trace of a live session.
 
 ## Decisions
 
