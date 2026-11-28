@@ -104,7 +104,7 @@ The start page opens with a scripted journey (outcome 13), showing how Solid is 
 - The script is drawn by the same map, timeline and detail components as a live session. Its entries are a type of their own, never trace entries, and every part of it is labelled as an example.
 - A person steps through it or plays it. The map adds parties and animates each exchange, then the parties move into the timeline's lanes, and each exchange opens in the detail panel.
 - It ends with "Try it yourself", where the person's own WebID runs the real flow through the same views.
-- Two tests keep the script true: its steps must match, in order, those of the live flow against the fictional servers, and every example must pass through the redaction module unchanged.
+- Two tests keep the script true: its steps must match, in order, those of the live flow against the fictional servers, and every example is built through the redaction module, with a test that none of its fake secrets is shown.
 
 ### Dependencies
 

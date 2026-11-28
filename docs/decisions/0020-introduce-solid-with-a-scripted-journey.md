@@ -37,7 +37,7 @@ The published descriptions of Solid have no picture of its parties or flows, and
 - It needs no servers, recording or capture script. It can show a refusal or a failure on cue, and its narration can say what to watch for.
 - It costs keeping the script true to what the app does. Two tests check that:
   - a browser test runs the live flow against the fictional servers, and compares its steps with the script's, in order
-  - a Node test passes every example through the redaction module, and fails if anything changes, so an example never shows what a real session would hide
+  - the examples hold fake secrets and are built through the redaction module, as a live session's exchanges are, and a Node test fails if any of those secrets is shown, so an example never shows what a real session would hide
 
 ### Real steps replayed from recordings
 
