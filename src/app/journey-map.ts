@@ -15,13 +15,17 @@ export class JourneyMap extends LitElement {
   static override properties = {
     journey: { attribute: false },
     selected: { attribute: false },
+    ghosts: { attribute: false },
   };
 
   declare journey: Journey;
   /** The trace entry the cursor is on, or null. */
   declare selected: number | null;
+  /** Whether to draw parties not found yet as places to expect, or leave them out. */
+  declare ghosts: boolean;
 
   #pulsed = 0;
+  #shownParties = new Set<string>();
 
   static override styles = css`
     :host {
@@ -153,10 +157,18 @@ export class JourneyMap extends LitElement {
     super();
     this.journey = { exchanges: [], found: [] };
     this.selected = null;
+    this.ghosts = true;
   }
 
   override render() {
-    const map = layOutMap(this.journey);
+    const laidOut = layOutMap(this.journey);
+    const map = this.ghosts
+      ? laidOut
+      : {
+          ...laidOut,
+          cards: laidOut.cards.filter((card) => card.found),
+          lines: laidOut.lines.filter((line) => line.style !== "expected"),
+        };
     const found = describeFound(this.journey);
     return html`
       <p>${found}</p>
@@ -175,6 +187,7 @@ export class JourneyMap extends LitElement {
   }
 
   override updated(): void {
+    this.#arrive();
     const latest = this.journey.exchanges.at(-1);
     if (latest === undefined || latest.id === this.#pulsed) {
       return;
@@ -191,6 +204,27 @@ export class JourneyMap extends LitElement {
       line.points.map(([x, y]) => ({ transform: `translate(${x + 20}px, ${y + 20}px)` })),
       { duration: 700, easing: "ease-in-out" },
     );
+  }
+
+  /** Brings each newly found party onto the map, unless the browser asks for reduced motion. */
+  #arrive(): void {
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (const card of this.renderRoot.querySelectorAll<SVGGElement>(".card.found")) {
+      const party = card.dataset["party"] ?? "";
+      if (this.#shownParties.has(party)) {
+        continue;
+      }
+      this.#shownParties.add(party);
+      if (!still) {
+        card.animate(
+          [
+            { opacity: 0, transform: "translateY(-12px)" },
+            { opacity: 1, transform: "none" },
+          ],
+          { duration: 500, easing: "ease-out" },
+        );
+      }
+    }
   }
 
   #line(line: Line): SVGTemplateResult {

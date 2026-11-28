@@ -18,6 +18,17 @@ export const lanes: readonly Party[] = [
   "notification-service",
 ];
 
+/** A party's name, short enough to head its lane in the timeline. */
+export function laneName(party: Party): string {
+  return {
+    app: "App",
+    "webid-profile": "Profile",
+    "identity-provider": "Provider",
+    pod: "Pod",
+    "notification-service": "Notices",
+  }[party];
+}
+
 export type Chapter = "discovery" | "login" | "pod" | "notifications";
 
 const chapterOfStep: Readonly<Record<string, Chapter>> = {

@@ -33,6 +33,7 @@ import type { ChooseEvent } from "./discovery-results.ts";
 import { deleteDpopKeyPair, loadDpopKeyPair, saveDpopKeyPair } from "./dpop-key-store.ts";
 import "./discovery-results.ts";
 import "./pod-browser.ts";
+import "./solid-introduction.ts";
 import "./token-inspector.ts";
 import "./trace-timeline.ts";
 
@@ -92,7 +93,8 @@ export class DemonstratorApp extends LitElement {
       color: CanvasText;
     }
     /* Prose keeps a reading measure; the plumbing view takes the full width. */
-    main > :not(.plumbing) {
+    main > :not(.plumbing),
+    .measure {
       max-width: 44rem;
     }
     label {
@@ -266,6 +268,31 @@ export class DemonstratorApp extends LitElement {
           services may log them in, and where their data is kept.
         </p>
         <p>This demonstrator follows a WebID through each step of a Solid app, and shows every exchange as it happens.</p>
+
+        ${
+          state.kind === "idle"
+            ? html`<section class="plumbing" aria-labelledby="introduction">
+                <h2 id="introduction">How Solid works</h2>
+                <p class="measure">
+                  Follow Alice, a fictional person, as an app finds her servers, logs her in, and
+                  reads and writes her Pod. Every exchange is an example, written from the Solid
+                  specifications.
+                </p>
+                <solid-introduction></solid-introduction>
+              </section>`
+            : nothing
+        }
+
+        <h2>Try it yourself</h2>
+        <p>
+          Enter your WebID to follow the same journey with your own servers. You'll log in at your
+          own identity provider, and the app works only in a folder of its own in your Pod.
+        </p>
+        <p>
+          No WebID yet? <a href="https://solidproject.org/get_a_pod">Get a Pod from a provider</a>
+          and it comes with one. You can also enter someone else's WebID: finding their servers
+          reads only what their profile makes public, but you can log in only as yourself.
+        </p>
 
         <form @submit=${this.#submit} novalidate>
           <label for="webid">WebID</label>

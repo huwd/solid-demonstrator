@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { chaptersOf, describeFound, journeyOf, otherParty } from "./journey.ts";
+import { chaptersOf, describeFound, journeyOf, laneName, lanes, otherParty } from "./journey.ts";
 import { entry, journeyEntries } from "./test-support/journey-entries.ts";
 
 describe("journeyOf", () => {
@@ -156,5 +156,11 @@ describe("chaptersOf", () => {
       ]),
       ["2 steps. 2 are still waiting for an answer."],
     );
+  });
+});
+
+describe("laneName", () => {
+  it("names each lane briefly", () => {
+    assert.deepEqual(lanes.map(laneName), ["App", "Profile", "Provider", "Pod", "Notices"]);
   });
 });

@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing, svg, type TemplateResult } from "lit";
 import { fieldNote, headerNote } from "../core/field-notes.ts";
-import { type ChapterSummary, chaptersOf, journeyOf, lanes } from "../core/journey.ts";
+import { type ChapterSummary, chaptersOf, journeyOf, laneName, lanes } from "../core/journey.ts";
 import type {
   Header,
   Party,
@@ -32,11 +32,17 @@ import "./journey-map.ts";
 export class TraceTimeline extends LitElement {
   static override properties = {
     trace: { attribute: false },
+    example: { type: Boolean },
+    showMap: { attribute: false },
     entries: { state: true },
     selected: { state: true },
   };
 
-  declare trace: Trace | undefined;
+  /** Where the entries come from: the live trace, or a fixed set of examples. */
+  declare trace: Pick<Trace, "entries" | "subscribe"> | undefined;
+  /** Whether the entries are examples, written from the specifications, not a live session. */
+  declare example: boolean;
+  declare showMap: boolean;
   declare entries: readonly TraceEntry[];
   /** The step the person picked, or null to follow the newest. */
   declare selected: number | null;
@@ -124,10 +130,26 @@ export class TraceTimeline extends LitElement {
     .lanes {
       flex: none;
     }
-    @container (max-width: 30rem) {
-      .lanes {
+    .lane-heads {
+      display: flex;
+      font-size: 0.75rem;
+      margin: 0 0 0.25rem;
+    }
+    .lane-heads span {
+      width: 44px;
+      text-align: center;
+    }
+    @container (max-width: 36rem) {
+      .lanes,
+      .lane-heads {
         display: none;
       }
+    }
+    .banner {
+      margin: 0 0 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border-left: 0.3rem solid light-dark(#d9b350, #b58f1f);
+      background: light-dark(#fff4d6, #3d3524);
     }
     .route {
       font-weight: bold;
@@ -184,6 +206,8 @@ export class TraceTimeline extends LitElement {
   constructor() {
     super();
     this.trace = undefined;
+    this.example = false;
+    this.showMap = true;
     this.entries = [];
     this.selected = null;
   }
@@ -228,14 +252,27 @@ export class TraceTimeline extends LitElement {
       (this.entries.at(-1) as TraceEntry);
     const index = this.entries.indexOf(current);
     return html`
-      <details class="map" open>
-        <summary>The map of the parties</summary>
-        <journey-map
-          .journey=${journey}
-          .selected=${current.id}
-          @select=${(event: CustomEvent<number>) => this.#select(event.detail)}
-        ></journey-map>
-      </details>
+      ${
+        this.example
+          ? html`<p class="banner">
+              Example: Alice's journey, written from the specifications. None of it is a live
+              session.
+            </p>`
+          : nothing
+      }
+      ${
+        this.showMap
+          ? html`<details class="map" open>
+              <summary>The map of the parties</summary>
+              <journey-map
+                .journey=${journey}
+                .selected=${current.id}
+                .ghosts=${!this.example}
+                @select=${(event: CustomEvent<number>) => this.#select(event.detail)}
+              ></journey-map>
+            </details>`
+          : nothing
+      }
       <div class="controls" role="group" aria-label="Step through the journey">
         <button type="button" ?disabled=${index === 0} @click=${() => this.#step(index - 1)}>
           Previous step
@@ -258,10 +295,25 @@ export class TraceTimeline extends LitElement {
           />
           Follow new steps
         </label>
+        ${
+          this.example
+            ? nothing
+            : html`<button type="button" @click=${() => this.#download()}>
+                Download this trace
+              </button>`
+        }
       </div>
       <div class="columns">
-        <div>${chaptersOf(journey).map((chapter) => this.#chapter(chapter, current.id))}</div>
-        <aside aria-label="The selected step">${renderDetail(current)}</aside>
+        <div>
+          <div class="lane-heads" aria-hidden="true">
+            ${lanes.map((party) => html`<span data-lane=${party}>${laneName(party)}</span>`)}
+          </div>
+          ${chaptersOf(journey).map((chapter) => this.#chapter(chapter, current.id))}
+        </div>
+        <aside aria-label="The selected step">
+          ${this.example ? html`<p class="banner">Example, not a live exchange</p>` : nothing}
+          ${renderDetail(current)}
+        </aside>
       </div>
     `;
   }
@@ -304,6 +356,19 @@ export class TraceTimeline extends LitElement {
     this.selected = id;
   }
 
+  /** Saves the trace as a file. Its entries were redacted as they were recorded (decision 0005). */
+  #download(): void {
+    const file = new Blob(
+      [JSON.stringify({ exported: new Date().toISOString(), entries: this.entries }, null, 2)],
+      { type: "application/json" },
+    );
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(file);
+    link.download = "solid-demonstrator-trace.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   #step(index: number): void {
     const entry = this.entries[index];
     if (entry !== undefined) {
@@ -312,7 +377,8 @@ export class TraceTimeline extends LitElement {
   }
 }
 
-const laneX = (party: Party) => 12 + 28 * lanes.indexOf(party);
+const laneWidth = 44;
+const laneX = (party: Party) => laneWidth / 2 + laneWidth * lanes.indexOf(party);
 
 /** The parties' lanes, with the entry drawn across them. Decorative: the route says it in words. */
 function renderLanes(entry: TraceEntry): TemplateResult {
@@ -335,7 +401,7 @@ function renderLanes(entry: TraceEntry): TemplateResult {
     mark = svg`<path d="M ${from} 20 L ${to - 6 * way} 20" style="stroke: ${colour}; stroke-width: 2; stroke-dasharray: ${entry.provenance === "reconstructed" ? "5 4" : "none"}"></path>
       <path d="M ${to} 20 L ${to - 7 * way} 15 L ${to - 7 * way} 25 Z" style="fill: ${colour}"></path>`;
   }
-  return html`<svg class="lanes" aria-hidden="true" width="136" height="40" viewBox="0 0 136 40">
+  return html`<svg class="lanes" aria-hidden="true" width="220" height="40" viewBox="0 0 220 40">
     ${lifelines}${mark}
   </svg>`;
 }

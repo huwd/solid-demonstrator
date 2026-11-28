@@ -10,11 +10,13 @@ It is for developers who know HTTP and OAuth, and want to understand how the par
 
 The demonstrator is published at <https://huwd.github.io/solid-demonstrator/>.
 
-Enter a WebID, such as `https://alice.example/profile#me`, and select **Discover**. The demonstrator then shows:
+The start page opens with an introduction to how Solid works. It follows Alice, a fictional person, as an app finds her servers, logs her in, reads and writes her Pod, watches it for changes and is refused a folder. You can play it, pause it and move between its chapters. Every exchange in it is an example, written from the Solid specifications and marked as one.
+
+Then try it yourself: enter a WebID, such as your own, and select **Discover**. The demonstrator then shows:
 
 - what the WebID's profile says: the person's name, their Pods, and the identity providers trusted to log them in
 - whether each identity provider is ready for login, and if not, why
-- a map of the parties it has found and what passed between them, and a timeline of every request it made, in chapters, where you can step through each one to see what was sent, what came back and what each part is for
+- a map of the parties it has found and what passed between them, and a timeline of every request it made, in chapters, where you can step through each one to see what was sent, what came back and what each part is for, and a button to download the trace, as recorded after redaction
 
 If you don't have a WebID, you can use anyone's, since profiles are public.
 
