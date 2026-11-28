@@ -54,7 +54,7 @@ Two government timeline components were reviewed for the plain account:
 
   Items are grouped into chapters, such as discovery and login, each opening with a sentence on what happened in it. This is the plain account the plan asks for.
 - **The detail panel** shows the request and response of the selected entry, as the Department for Work and Pensions advises, keeping the timeline brief. Each header and field is annotated with what it means, as The Illustrated TLS 1.3 Connection does. The panel sits beside the timeline, or below it on a small screen.
-- **One cursor** selects a step, and highlights it in all three views. In a live session it follows the latest entry. "Step 9 of 31", with buttons for the previous and next steps, lets someone step back through any journey, live or the tour's ([decision 0006](0006-tour-from-recorded-journeys.md)).
+- **One cursor** selects a step, and highlights it in all three views. In a live session it follows the latest entry. "Step 9 of 31", with buttons for the previous and next steps, lets someone step back through any journey, live or the tour's ([decision 0020](0020-introduce-solid-with-a-scripted-journey.md)).
 
 It covers each picture the plan asks for, keeps the timeline as the text equivalent of the pictures, and handles a journey of any length or shape.
 It costs three components that must stay in step, which the shared cursor and shared trace make possible.

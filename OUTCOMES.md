@@ -163,10 +163,10 @@ A person can log out and the demonstrator forgets them: tokens, keys and trace a
 
 A person with no WebID can still understand the whole journey, and can get an account if they want to try it for real.
 
-- **Take the tour.** The start page offers a tour of the full journey with no login: discovery, login, reading and writing the Pod, and notifications. It uses the same outcome and plumbing views as a live session.
-  - The tour follows a fictional person on a fictional stack. Its requests and responses were captured from real servers in the project's test environment, so they show real behaviour, and no real person's data appears.
-  - Every screen of the tour is clearly labelled as a tour, so it can't be mistaken for a live session.
-  - The tour shows a failure as well as success, such as another WebID being refused by the Pod.
+- **Take the tour.** The start page opens with a scripted journey through the whole of Solid with no login: discovery, login, reading and writing the Pod, and notifications. It draws them in the same pictures as a live session, and ends with "Try it yourself".
+  - The tour follows a fictional person on fictional servers. Its exchanges are examples written from the specifications, and checked against the steps the live app takes, so no real person's data appears.
+  - Every part of the tour is clearly labelled as an example, so it can't be mistaken for a live session.
+  - The tour shows a failure as well as success, such as a write the Pod refuses.
 - **Get an account.** The start page links to at least one public Solid provider where a person can create a WebID and Pod, explains in a sentence what they will get, and says that they can return and start from their new WebID.
 - **Try someone else's WebID.** A person can enter any public WebID, such as the one in the examples. Discovery works for anyone. The demonstrator explains that they can't complete the login, because only the WebID's owner can log in as that WebID.
 
