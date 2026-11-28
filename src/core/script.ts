@@ -522,6 +522,31 @@ export const aliceScript: readonly ScriptChapter[] = [
         ),
       },
       {
+        step: "notification",
+        from: "notification-service",
+        to: "app",
+        provenance: "seen",
+        purpose: `A notification: Add of ${scratch}note.txt.`,
+        explanation:
+          "The service tells everyone watching the folder that something was added to it, here even before the Pod's answer to the write reaches the app. It would do the same for a change from another app.",
+        specification: websocket,
+        message: {
+          kind: "json",
+          value: {
+            "@context": [
+              "https://www.w3.org/ns/activitystreams",
+              "https://www.w3.org/ns/solid/notification/v1",
+            ],
+            id: "urn:uuid:3c5e7a9b-1d2f-4e6a-8b0c-2d4f6a8b0c1e",
+            type: "Add",
+            object: `${scratch}note.txt`,
+            target: scratch,
+            state: '"n1"',
+            published: "2027-01-01T09:00:19Z",
+          },
+        },
+      },
+      {
         step: "createResource",
         from: "app",
         to: "pod",
@@ -539,31 +564,6 @@ export const aliceScript: readonly ScriptChapter[] = [
           turtle("Hello from the demonstrator."),
         ),
         response: response(201, "Created", [["etag", '"n1"']]),
-      },
-      {
-        step: "notification",
-        from: "notification-service",
-        to: "app",
-        provenance: "seen",
-        purpose: `A notification: Add of ${scratch}note.txt.`,
-        explanation:
-          "The service tells everyone watching the folder that something was added to it. It would do the same for a change from another app.",
-        specification: websocket,
-        message: {
-          kind: "json",
-          value: {
-            "@context": [
-              "https://www.w3.org/ns/activitystreams",
-              "https://www.w3.org/ns/solid/notification/v1",
-            ],
-            id: "urn:uuid:3c5e7a9b-1d2f-4e6a-8b0c-2d4f6a8b0c1e",
-            type: "Add",
-            object: `${scratch}note.txt`,
-            target: scratch,
-            state: '"n1"',
-            published: "2027-01-01T09:00:19Z",
-          },
-        },
       },
       {
         step: "readContainer",

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, type Page, type Request, test } from "@playwright/test";
+import { aliceScript, scriptSteps } from "../core/script.ts";
 import { signTestJwt, testJwks } from "../core/test-support/tokens.ts";
 import {
   type Answer,
@@ -859,4 +860,51 @@ test("says when the Pod offers no notifications, and the rest still works", asyn
     "The Pod doesn't offer notifications over a WebSocket",
   );
   await expect(browser.getByRole("button", { name: "Use the scratch folder" })).toBeVisible();
+});
+
+test("takes the steps the introduction's script shows, in the same order", async ({ page }) => {
+  const provider = await serveAlice(page, { pod: { [`${pod}private/`]: { status: 403 } } });
+  await discoverAlice(page);
+  await logIn(page, "Allow");
+  const browser = page.locator("pod-browser");
+  const timeline = page.locator("trace-timeline");
+  const steps = timeline.locator("li");
+  await expect(page.getByText(`Logged in as ${webId}`)).toBeVisible();
+  await expect(steps).toHaveCount(13);
+
+  await browser.getByRole("button", { name: "Use the scratch folder" }).click();
+  await expect(steps).toHaveCount(15);
+  await browser
+    .getByRole("region", { name: "Notifications" })
+    .getByRole("button", { name: /^Watch/ })
+    .click();
+  await expect(steps).toHaveCount(17);
+  const create = browser.getByRole("form", { name: "Create" });
+  await create.getByLabel("Name").fill("note.txt");
+  await create.getByRole("button", { name: "Create" }).click();
+  await expect(steps).toHaveCount(20);
+  await browser.getByRole("button", { name: "alice", exact: true }).click();
+  await expect(steps).toHaveCount(21);
+  await browser.getByRole("button", { name: "private" }).click();
+  await expect(steps).toHaveCount(22);
+  expect(provider.pod.subscriptions).toHaveLength(1);
+
+  const live = await steps.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-step")),
+  );
+  expect(live).toEqual(scriptSteps(aliceScript));
+});
+
+test("downloads the trace, as it was recorded after redaction", async ({ page }) => {
+  await serveAlice(page);
+  await discoverAlice(page);
+  const download = page.waitForEvent("download");
+  await page.locator("trace-timeline").getByRole("button", { name: "Download this trace" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe("solid-demonstrator-trace.json");
+  const saved = JSON.parse(await new Response((await file.createReadStream()) as never).text());
+  expect(saved.entries.map((entry: { step: string }) => entry.step)).toEqual([
+    "fetchWebIdProfile",
+    "discoverIssuer",
+  ]);
 });
