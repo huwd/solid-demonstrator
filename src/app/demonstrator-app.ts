@@ -84,12 +84,16 @@ export class DemonstratorApp extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      max-width: 44rem;
+      max-width: 80rem;
       margin: 0 auto;
       padding: 2rem 1rem;
       font-family: system-ui, sans-serif;
       line-height: 1.5;
       color: CanvasText;
+    }
+    /* Prose keeps a reading measure; the plumbing view takes the full width. */
+    main > :not(.plumbing) {
+      max-width: 44rem;
     }
     label {
       display: block;
@@ -307,10 +311,12 @@ export class DemonstratorApp extends LitElement {
             : html`
               <h2>Every exchange so far</h2>
               <p>
-                Each request the app made, in order. Open one to see what was sent and what came
+                Each request the app made, in order. Choose one to see what was sent and what came
                 back. Secrets are hidden or shortened before anything is recorded.
               </p>
-              <trace-timeline .trace=${this.#trace}></trace-timeline>
+              <section class="plumbing" aria-label="Every exchange so far">
+                <trace-timeline .trace=${this.#trace}></trace-timeline>
+              </section>
             `
         }
       </main>

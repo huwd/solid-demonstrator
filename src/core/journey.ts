@@ -29,7 +29,8 @@ const chapterOfStep: Readonly<Record<string, Chapter>> = {
   returnFromIdentityProvider: "login",
   exchangeCode: "login",
   checkTokenWebId: "login",
-  checkPodTrust: "login",
+  // The app repeats the Pod's checks as it starts reading the Pod.
+  checkPodTrust: "pod",
   readStorageDescription: "pod",
   readContainer: "pod",
   readResource: "pod",
@@ -97,7 +98,11 @@ export function journeyOf(entries: readonly TraceEntry[]): Journey {
       verdict: entry.verdict.kind,
       at: entry.at,
       status: entry.response?.status ?? null,
-      host: entry.request === undefined ? null : (URL.parse(entry.request.url)?.host ?? null),
+      // Only a request the app sent says where the other party is; a return to the app carries the app's own address.
+      host:
+        entry.request === undefined || entry.from !== "app"
+          ? null
+          : (URL.parse(entry.request.url)?.host ?? null),
     };
   });
   return { exchanges, found: foundParties(exchanges) };

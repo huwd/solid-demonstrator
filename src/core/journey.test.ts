@@ -18,7 +18,7 @@ describe("journeyOf", () => {
         "login",
         "login",
         "login",
-        "login",
+        "pod",
         "pod",
         "pod",
         "notifications",
@@ -49,11 +49,15 @@ describe("journeyOf", () => {
       entry(1, "somethingNew", "app", "pod", "seen"),
       entry(2, "exchangeCode", "app", "identity-provider", "seen"),
       entry(3, "somethingElse", "app", "pod", "seen", { url: "not a url" }),
+      entry(4, "returnFromIdentityProvider", "identity-provider", "app", "reconstructed", {
+        url: "https://demonstrator.example/?code=x",
+      }),
     ]);
     assert.deepEqual(
       steps.exchanges.map((exchange) => [exchange.chapter, exchange.host]),
       [
         ["discovery", null],
+        ["login", null],
         ["login", null],
         ["login", null],
       ],
@@ -121,8 +125,8 @@ describe("chaptersOf", () => {
       ]),
       [
         ["discovery", "Discovery", 2, "2 steps, all as expected."],
-        ["login", "Login", 7, "7 steps, all as expected."],
-        ["pod", "Reading and writing", 2, "2 steps. 1 went other than expected."],
+        ["login", "Login", 6, "6 steps, all as expected."],
+        ["pod", "Reading and writing", 3, "3 steps. 1 went other than expected."],
         ["notifications", "Notifications", 3, "3 steps, all as expected."],
       ],
     );

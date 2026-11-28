@@ -14,7 +14,7 @@ Enter a WebID, such as `https://alice.example/profile#me`, and select **Discover
 
 - what the WebID's profile says: the person's name, their Pods, and the identity providers trusted to log them in
 - whether each identity provider is ready for login, and if not, why
-- a timeline of every request it made, which you can open to see what was sent and what came back
+- a map of the parties it has found and what passed between them, and a timeline of every request it made, in chapters, where you can step through each one to see what was sent, what came back and what each part is for
 
 If you don't have a WebID, you can use anyone's, since profiles are public.
 
