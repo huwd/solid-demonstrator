@@ -26,9 +26,9 @@ const places: Readonly<Record<Party, { readonly x: number; readonly y: number }>
 const hints: Readonly<Record<Party, string>> = {
   app: "in your browser",
   "webid-profile": "the WebID you enter",
-  "identity-provider": "named by the profile",
-  pod: "named by the profile",
-  "notification-service": "named by the Pod",
+  "identity-provider": "found from the profile",
+  pod: "found from the profile",
+  "notification-service": "found from the Pod",
 };
 
 export type Point = readonly [x: number, y: number];

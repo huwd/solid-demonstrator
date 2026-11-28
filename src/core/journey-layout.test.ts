@@ -16,9 +16,9 @@ describe("layOutMap, before anything happens", () => {
       [
         ["app", true, "in your browser"],
         ["webid-profile", false, "the WebID you enter"],
-        ["identity-provider", false, "named by the profile"],
-        ["pod", false, "named by the profile"],
-        ["notification-service", false, "named by the Pod"],
+        ["identity-provider", false, "found from the profile"],
+        ["pod", false, "found from the profile"],
+        ["notification-service", false, "found from the Pod"],
       ],
     );
   });

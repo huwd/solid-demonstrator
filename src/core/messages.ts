@@ -262,18 +262,18 @@ export function describeExchangeProblem(problem: ExchangeProblem, issuer: string
   switch (problem.kind) {
     case "request-failed":
       return {
-        summary: `${issuer}'s token endpoint couldn't be reached`,
+        summary: `${issuer} couldn't be reached to finish logging in`,
         detail: problem.diagnosis.summary,
       };
     case "refused":
       return problem.error === "invalid_grant"
         ? {
-            summary: `${issuer} wouldn't exchange the code`,
+            summary: `${issuer} wouldn't accept the login code`,
             detail:
-              "It said invalid_grant. A code works once, and only for a short time, so it may have expired or been used already. Log in again.",
+              "The code may have expired or been used already: each one works once, and only for a short time. Log in again. The provider answered invalid_grant.",
           }
         : {
-            summary: `${issuer} wouldn't exchange the code`,
+            summary: `${issuer} wouldn't accept the login code`,
             detail: `It answered ${problem.status} with ${problem.error}${problem.description === null ? "" : `: ${problem.description}`}.`,
           };
     case "not-dpop":

@@ -160,14 +160,17 @@ function foundParties(exchanges: readonly Exchange[]): readonly FoundParty[] {
 }
 
 const nouns: Readonly<Record<Exclude<Party, "app">, readonly [one: string, many: string]>> = {
-  "webid-profile": ["your WebID profile", "WebID profiles"],
+  "webid-profile": ["WebID profile", "WebID profiles"],
   "identity-provider": ["identity provider", "identity providers"],
   pod: ["Pod", "Pods"],
   "notification-service": ["notification service", "notification services"],
 };
 
-/** The map's text equivalent: which parties have been found, in words. */
-export function describeFound(journey: Journey): string {
+/**
+ * The map's text equivalent: which parties have been found, in words, for
+ * the person whose journey it is: "your" or, say, "Alice's".
+ */
+export function describeFound(journey: Journey, whose = "your"): string {
   const parts = lanes.flatMap((party) => {
     const found = journey.found.find((candidate) => candidate.party === party);
     if (party === "app" || found === undefined) {
@@ -176,7 +179,9 @@ export function describeFound(journey: Journey): string {
     const count = Math.max(1, found.hosts.length);
     const [one, many] = nouns[party];
     return [
-      party === "webid-profile" && count === 1 ? one : `${count} ${count === 1 ? one : many}`,
+      party === "webid-profile" && count === 1
+        ? `${whose} ${one}`
+        : `${count} ${count === 1 ? one : many}`,
     ];
   });
   if (parts.length === 0) {

@@ -238,7 +238,7 @@ test("explains when the provider won't exchange the code", async ({ page }) => {
   await serveAlice(page, { tokenStatus: 400, tokens: { error: "invalid_grant" } });
   await discoverAlice(page);
   await logIn(page, "Allow");
-  await expect(page.getByRole("alert")).toContainText("wouldn't exchange the code");
+  await expect(page.getByRole("alert")).toContainText("wouldn't accept the login code");
 });
 
 test("refuses a token that isn't bound to the key", async ({ page }) => {

@@ -84,6 +84,10 @@ describe("describeFound", () => {
   it("says which parties have been found, in words", () => {
     assert.equal(describeFound(journeyOf([])), "Nothing found yet.");
     assert.equal(
+      describeFound(journeyOf(journeyEntries.slice(0, 1)), "Alice's"),
+      "Found so far: Alice's WebID profile.",
+    );
+    assert.equal(
       describeFound(journeyOf(journeyEntries.slice(0, 1))),
       "Found so far: your WebID profile.",
     );

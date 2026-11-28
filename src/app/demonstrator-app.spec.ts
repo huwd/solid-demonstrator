@@ -13,6 +13,6 @@ test("the app starts, with its introduction and no errors", async ({ page }) => 
 
   await expect(page).toHaveTitle("Solid Demonstrator");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Solid Demonstrator");
-  await expect(page.getByRole("main")).toContainText("A WebID is a URL that names a person.");
+  await expect(page.getByRole("main")).toContainText("With Solid, your data lives in a Pod");
   expect(errors).toEqual([]);
 });

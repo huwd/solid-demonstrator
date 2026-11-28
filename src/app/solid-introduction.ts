@@ -99,7 +99,7 @@ export class SolidIntroduction extends LitElement {
       ${
         this.shown === 0
           ? html``
-          : html`<trace-timeline example .trace=${this.#source}></trace-timeline>`
+          : html`<trace-timeline example .whose=${"Alice's"} .trace=${this.#source}></trace-timeline>`
       }
     `;
   }
