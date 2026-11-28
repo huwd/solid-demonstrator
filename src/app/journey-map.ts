@@ -16,6 +16,7 @@ export class JourneyMap extends LitElement {
     journey: { attribute: false },
     selected: { attribute: false },
     ghosts: { attribute: false },
+    whose: { attribute: false },
   };
 
   declare journey: Journey;
@@ -23,6 +24,8 @@ export class JourneyMap extends LitElement {
   declare selected: number | null;
   /** Whether to draw parties not found yet as places to expect, or leave them out. */
   declare ghosts: boolean;
+  /** Whose journey it is, for the sentence on what has been found: "your", or "Alice's". */
+  declare whose: string;
 
   #pulsed = 0;
   #shownParties = new Set<string>();
@@ -151,6 +154,34 @@ export class JourneyMap extends LitElement {
     p {
       margin: 0 0 0.5rem;
     }
+    .key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.25rem;
+      margin: 0.5rem 0 0;
+      font-size: 0.875rem;
+    }
+    .key > span {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .key svg {
+      min-width: 0;
+      width: 36px;
+      height: 14px;
+    }
+    .key .swatch-note {
+      fill: var(--note);
+      stroke: var(--muted);
+    }
   `;
 
   constructor() {
@@ -158,6 +189,7 @@ export class JourneyMap extends LitElement {
     this.journey = { exchanges: [], found: [] };
     this.selected = null;
     this.ghosts = true;
+    this.whose = "your";
   }
 
   override render() {
@@ -169,7 +201,7 @@ export class JourneyMap extends LitElement {
           cards: laidOut.cards.filter((card) => card.found),
           lines: laidOut.lines.filter((line) => line.style !== "expected"),
         };
-    const found = describeFound(this.journey);
+    const found = describeFound(this.journey, this.whose);
     return html`
       <p>${found}</p>
       <div class="scroll"><svg viewBox="0 0 ${mapSize.width} ${mapSize.height}" role="img" aria-label=${`The parties, and what passed between them. ${found}`}>
@@ -183,6 +215,7 @@ export class JourneyMap extends LitElement {
         ${map.cards.map((card) => this.#card(card))}
         <circle class="pulse" r="6" cx="-20" cy="-20"></circle>
       </svg></div>
+      ${key}
     `;
   }
 
@@ -271,6 +304,30 @@ export class JourneyMap extends LitElement {
     this.dispatchEvent(new CustomEvent("select", { detail: id, bubbles: true, composed: true }));
   }
 }
+
+/** What the map's lines and notes mean, as decision 0004 labels each step. */
+const key = html`<p class="key"><span class="visually-hidden">Key: </span>
+  <span>
+    <svg viewBox="0 0 36 14" aria-hidden="true"><path class="line seen" d="M 2 7 L 34 7"></path></svg>
+    Solid line: seen by the app
+  </span>
+  <span>
+    <svg viewBox="0 0 36 14" aria-hidden="true"><path class="line reconstructed" d="M 2 7 L 34 7"></path></svg>
+    Dashed line: pieced together, out of the app's sight
+  </span>
+  <span>
+    <svg viewBox="0 0 36 14" aria-hidden="true"><path class="line repeated" d="M 10 2 L 26 2 L 26 12 L 10 12"></path></svg>
+    Loop: checked again by the app
+  </span>
+  <span>
+    <svg viewBox="0 0 36 14" aria-hidden="true"><rect class="swatch-note" x="4" y="1" width="28" height="12" rx="3"></rect></svg>
+    Note: explained, since it happens out of sight
+  </span>
+  <span>
+    <svg viewBox="0 0 36 14" aria-hidden="true"><path class="line marked" d="M 2 7 L 34 7"></path></svg>
+    Red: didn't go as expected
+  </span>
+</p>`;
 
 /** Where a party's note on its explained steps goes, clear of its lines. */
 function notePlace(card: Card): Point {

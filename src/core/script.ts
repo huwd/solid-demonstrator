@@ -211,24 +211,24 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "Who's involved",
     narration:
-      "Alice wants to use an app with her data. In Solid, her data doesn't live in the app: it lives in her Pod, a store on the web that she chooses. The app starts out knowing only her WebID, an address that identifies her.",
-    watchFor: "Watch each party appear on the map as the app finds it.",
+      "Alice wants to use an app with the data in her Pod. Four parties take part: the app, Alice's profile, the service she logs in with, and her Pod. The app starts out knowing one thing: Alice's WebID, a web address that stands for her.",
+    watchFor: "Each party appears on the map as the app finds it.",
     steps: [],
   },
   {
     title: "Finding Alice's servers",
     narration:
-      "The app reads Alice's WebID profile. It names the identity provider she logs in with, and the Pod that holds her data. The app then asks the provider how to log in with it.",
-    watchFor: "The profile is the only thing the app needs to know in advance.",
+      "The app opens the page at Alice's WebID: her profile. It names the service that logs her in, called her identity provider, and says where her Pod is. The app then asks the identity provider how logging in works there.",
+    watchFor: "The WebID is all the app needs to know in advance. It finds everything else.",
     steps: [
       {
         step: "fetchWebIdProfile",
         from: "app",
         to: "webid-profile",
         provenance: "seen",
-        purpose: "Fetch Alice's WebID profile, to find her identity provider and Pod.",
+        purpose: "Open Alice's profile, to find her identity provider and her Pod.",
         explanation:
-          "A WebID is a URL. Fetching it, without the part after #, gives Alice's profile: a small Turtle document saying who she trusts to log her in (solid:oidcIssuer) and where her data is (pim:storage).",
+          "A WebID is a web address. Opening it, without the part after #, gives Alice's profile. It's written in Turtle, a format for data on the web. Two lines matter here: solid:oidcIssuer names who may log her in, and pim:storage names her Pod.",
         specification: "https://solidproject.org/TR/protocol#webid",
         request: request("GET", profile, [["accept", "text/turtle"]]),
         response: profileResponse,
@@ -238,9 +238,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "identity-provider",
         provenance: "seen",
-        purpose: "Ask the identity provider how to log in with it.",
+        purpose: "Ask Alice's identity provider how to log in with it.",
         explanation:
-          "Every OpenID provider publishes its configuration at a well-known address: where to send people to log in, where to swap a code for tokens, and which features it supports, such as PKCE and DPoP.",
+          "Every identity provider describes itself at a fixed address. The description says where to send people to log in, where the app collects its pass afterwards, and which safety features the provider supports. Two of those, PKCE and DPoP, come up in the next chapter.",
         specification: "https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig",
         request: request("GET", `${broker}/.well-known/openid-configuration`),
         response: brokerConfiguration,
@@ -250,18 +250,18 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "Logging in",
     narration:
-      "The app sends Alice to her own identity provider to log in, so the app never sees her password. She comes back with a one-time code, which the app swaps for tokens. The access token names her WebID, and works only with proofs from a key this browser tab holds.",
+      "The app sends Alice to her identity provider to log in, so the app never sees her password. She comes back with a one-time code. The app swaps it for a pass that says who she is, called an access token. The pass only works with a stamp that this browser tab alone can make, so a stolen pass is useless.",
     watchFor:
-      "Dashed lines are reconstructed: the browser made those trips, so the app can only rebuild them. The loop is the app checking the token itself.",
+      "Dashed lines are trips the browser made out of the app's sight, so the app pieces them together. The loop is the app checking things for itself.",
     steps: [
       {
         step: "redirectToIdentityProvider",
         from: "app",
         to: "identity-provider",
         provenance: "reconstructed",
-        purpose: "Send Alice to her identity provider's login page.",
+        purpose: "Send Alice to her identity provider to log in.",
         explanation:
-          "The browser leaves the app for the provider's own page. The request carries a PKCE challenge, so only this app can use the code that comes back, and a state value the app checks when Alice returns.",
+          "The browser leaves the app for the identity provider's own page. The address carries a PKCE challenge: a puzzle only this app can answer, so only this app can use the code that comes back. It also carries a state value, which the app checks when Alice returns, to be sure she's coming back from this login.",
         specification: "https://solidproject.org/TR/oidc#authorization-code-pkce-flow",
         request: request(
           "GET",
@@ -275,7 +275,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         provenance: "explained",
         purpose: "Alice logs in, and agrees to let the app act for her.",
         explanation:
-          "This happens on the provider's pages, out of the app's sight. The provider fetches the app's Client ID Document to show Alice who is asking. Agreeing lets the app log in as Alice: it grants no access to her data by itself.",
+          "This happens on the identity provider's own pages, out of the app's sight. The provider reads the app's Client ID Document, a short public description of the app, to show Alice who is asking. Agreeing lets the app act for Alice. It doesn't open her Pod by itself: the Pod's own rules decide that.",
         specification: "https://openid.net/specs/openid-connect-core-1_0.html#Consent",
       },
       {
@@ -285,7 +285,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         provenance: "reconstructed",
         purpose: "Alice comes back to the app with a one-time code.",
         explanation:
-          "The provider sends the browser back to the app with the code, the state the app sent, and its own name, so the app can check the answer is to its own request and from the provider it chose.",
+          "The identity provider sends the browser back to the app. The address holds the code, the state value the app sent, and the provider's own address. The app checks them, to be sure the answer is to its own request and from the provider it chose.",
         specification: "https://www.rfc-editor.org/rfc/rfc9207.html",
         request: request(
           "GET",
@@ -297,9 +297,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "identity-provider",
         provenance: "seen",
-        purpose: "Swap the one-time code for tokens, bound to this tab's key.",
+        purpose: "Swap the one-time code for a pass that says who Alice is.",
         explanation:
-          "The app sends the code with the PKCE verifier, proving it started the login, and a DPoP proof made with a key that never leaves this tab. The provider binds the access token to that key, so a stolen token is useless without it.",
+          "The app sends the code with the answer to its PKCE puzzle, proving it started this login. It also sends a DPoP proof: a stamp made with a key that never leaves this browser tab. The identity provider ties the pass, the access token, to that key, so the pass is useless without it. An ID token comes back too, telling the app who logged in.",
         specification: "https://solidproject.org/TR/oidc#tokens",
         request: request(
           "POST",
@@ -334,9 +334,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "webid-profile",
         provenance: "seen",
-        purpose: "Fetch the WebID profile the token names, to check it trusts this provider.",
+        purpose: "Open the profile the pass names, to check it trusts this identity provider.",
         explanation:
-          "A Pod checks that the profile of the WebID in the token names the token's issuer. Otherwise any provider could issue tokens naming anyone. The app fetches the profile to make the same check.",
+          "Anyone can run an identity provider. So a Pod checks that the person's own profile names the identity provider that issued their pass. Otherwise any provider could issue passes naming anyone. The app makes the same check, so you can see it.",
         specification: "https://solidproject.org/TR/oidc",
         request: request("GET", profile, [["accept", "text/turtle"]]),
         response: profileResponse,
@@ -346,9 +346,10 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "app",
         provenance: "repeated",
-        purpose: "Check Alice's profile names the token's issuer, as the Pod will.",
+        purpose:
+          "Check Alice's profile names the identity provider that issued the pass, as the Pod will.",
         explanation:
-          "The profile names https://broker.example as an identity provider for Alice, so a Pod will accept tokens from it that name her WebID.",
+          "The profile names https://broker.example as Alice's identity provider, so a Pod will accept passes from it that name her WebID.",
         specification: "https://solidproject.org/TR/oidc",
         verdict: asExpected,
       },
@@ -357,8 +358,9 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "Reading Alice's Pod",
     narration:
-      "The app reads Alice's Pod as her. Every request carries the access token and a fresh proof. The Pod checks both, then its access rules, before it answers. The app repeats the checks it can, so you can see what the Pod sees.",
-    watchFor: "The Pod and the notification service share a box: they're one service.",
+      "The app now reads Alice's Pod as her. Every request carries the pass and a fresh stamp. The Pod checks both, then its own rules on who may open what, before it answers. The app repeats the checks it can, so you can see what the Pod sees.",
+    watchFor:
+      "The Pod and its notification service share a shaded box: they run at the same address.",
     steps: [
       {
         step: "readContainer",
@@ -367,7 +369,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         provenance: "seen",
         purpose: "Read the top folder of Alice's Pod, as Alice.",
         explanation:
-          "Folders in a Pod are containers. Reading one lists what it holds. The WAC-Allow header says what Alice may do here, and the Link header points to the storage description.",
+          "Reading a folder lists what's in it. Solid calls folders containers. Headers are notes that travel with the answer: WAC-Allow says what Alice may do here, and Link points to the Pod's description of itself.",
         specification: readingPod,
         request: toPod("GET", pod, [["accept", "text/turtle"]]),
         response: response(
@@ -383,9 +385,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         to: "identity-provider",
         provenance: "seen",
         purpose:
-          "Fetch the identity provider's configuration, to find its public keys, as the Pod will.",
+          "Read the identity provider's description, to find its public keys, as the Pod will.",
         explanation:
-          "To check the token's signature, a Pod needs the keys of the provider that signed it. The configuration says where they are.",
+          "To check a pass is genuine, a Pod needs the keys of the identity provider that signed it. The provider's description says where they are.",
         specification: "https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig",
         request: request("GET", `${broker}/.well-known/openid-configuration`),
         response: brokerConfiguration,
@@ -396,9 +398,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         to: "pod",
         provenance: "seen",
         purpose:
-          "Read the storage description, to find what the Pod offers, such as notifications.",
+          "Read the Pod's description of itself, to find what it offers, such as notifications.",
         explanation:
-          "A Pod describes itself at the address its Link header names. This one offers notifications over a WebSocket.",
+          "A Pod describes itself at the address its Link header names. This one offers notifications over a WebSocket: a connection that stays open, so the Pod can send news as it happens.",
         specification: "https://solidproject.org/TR/protocol#storage-description",
         request: toPod("GET", "https://pod.example/.well-known/solid", [["accept", "text/turtle"]]),
         response: response(
@@ -416,9 +418,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "identity-provider",
         provenance: "seen",
-        purpose: "Fetch the identity provider's public keys, to check the token's signature.",
+        purpose: "Fetch the identity provider's public keys, to check the pass is genuine.",
         explanation:
-          "The provider publishes the public halves of the keys it signs tokens with. Anyone can check a signature with them.",
+          "The identity provider signs each pass with a private key, and publishes the matching public key. Anyone can use it to check a signature, but not to make one.",
         specification: "https://www.rfc-editor.org/rfc/rfc7517#section-5",
         request: request("GET", `${broker}/jwks`),
         response: response(200, "OK", [["content-type", "application/json"]], {
@@ -431,9 +433,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "app",
         provenance: "repeated",
-        purpose: "Check the access token and a DPoP proof as the Pod will.",
+        purpose: "Check the pass and a stamp, as the Pod will.",
         explanation:
-          "The token is signed by Alice's provider, is for Solid, and hasn't expired. The proof names this request, is fresh, and was signed with the key the token is bound to. Only the Pod applies its access rules: those are its own.",
+          "The pass was signed by Alice's identity provider, is meant for Solid, and hasn't expired. The stamp names this request, is fresh, and was made with the key the pass is tied to. Only the Pod applies its rules on who may open what: those are its own.",
         specification: "https://solidproject.org/TR/oidc",
         verdict: asExpected,
       },
@@ -442,17 +444,18 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "Writing to Alice's Pod",
     narration:
-      "The app writes only in a folder of its own, unless Alice chooses otherwise. Each write says which version it expects, so it can never overwrite someone else's change.",
-    watchFor: "If-None-Match: * means create this only if nothing is there yet.",
+      "The app writes only in a folder of its own, unless Alice chooses otherwise. Each write tells the Pod what it expects to find, so it can never overwrite someone else's change by mistake.",
+    watchFor:
+      "Writing goes the same way as reading: from the app to the Pod, with the pass and a stamp.",
     steps: [
       {
         step: "createResource",
         from: "app",
         to: "pod",
         provenance: "seen",
-        purpose: "Create the app's scratch folder, unless it's already there.",
+        purpose: "Create the app's own folder, unless it's already there.",
         explanation:
-          "A PUT to an address ending in a slash makes a folder there. If-None-Match: * asks the Pod to refuse if anything is already at that address.",
+          "Writing to an address that ends in a slash makes a folder there. The If-None-Match: * header asks the Pod to refuse if anything is already at that address.",
         specification: writingPod,
         request: toPod("PUT", scratch, [
           ["content-type", "text/turtle"],
@@ -465,7 +468,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "pod",
         provenance: "seen",
-        purpose: "Read the scratch folder, to list what it holds.",
+        purpose: "Read the app's folder, to list what's in it.",
         explanation: "The new folder is empty.",
         specification: readingPod,
         request: toPod("GET", scratch, [["accept", "text/turtle"]]),
@@ -476,7 +479,7 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "Watching for changes",
     narration:
-      "The app subscribes to the scratch folder. The Pod's notification service answers with an address to listen at, and tells the app about each change there, whoever made it.",
+      "The app asks to be told about changes to its folder. The Pod's notification service gives it an address to listen at, then sends a message for each change, whoever made it.",
     watchFor: "The notification travels from the service back to the app.",
     steps: [
       {
@@ -484,9 +487,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "notification-service",
         provenance: "seen",
-        purpose: `Subscribe to changes to ${scratch}, over a WebSocket.`,
+        purpose: `Ask to be told about changes to ${scratch}.`,
         explanation:
-          "The storage description named this subscription service. The service checks Alice may read the folder, then answers with the address to listen at. Anyone with that address can listen, so it's shortened here.",
+          "The Pod's description named this notification service. The service checks Alice may read the folder, then answers with an address to listen at. Anyone with that address can listen, so it's shortened here.",
         specification: websocket,
         request: toPod("POST", subscriptionService, [["content-type", "application/ld+json"]], {
           kind: "json",
@@ -512,8 +515,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "notification-service",
         provenance: "seen",
-        purpose: "Open the WebSocket the channel named, to receive notifications.",
-        explanation: "No token is sent: holding the address is what lets the app listen.",
+        purpose: "Connect to the address the service gave, to receive notifications.",
+        explanation:
+          "The connection is a WebSocket, which stays open. No pass is sent: holding the address is what lets the app listen.",
         specification: websocket,
         request: request(
           "GET",
@@ -526,7 +530,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "notification-service",
         to: "app",
         provenance: "seen",
-        purpose: `A notification: Add of ${scratch}note.txt.`,
+        purpose: `A notification: ${scratch}note.txt was added.`,
         explanation:
           "The service tells everyone watching the folder that something was added to it, here even before the Pod's answer to the write reaches the app. It would do the same for a change from another app.",
         specification: websocket,
@@ -551,8 +555,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "pod",
         provenance: "seen",
-        purpose: "Create a note in the scratch folder.",
-        explanation: "The Pod answers with the new note's version, its ETag.",
+        purpose: "Create a note in the app's folder.",
+        explanation:
+          "The Pod answers with the version of the note, called its ETag. The app sends it back with any later change, so the change only happens if nobody else has changed the note since.",
         specification: writingPod,
         request: toPod(
           "PUT",
@@ -570,7 +575,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "pod",
         provenance: "seen",
-        purpose: "Read the scratch folder again, to list the new note.",
+        purpose: "Read the app's folder again, to list the new note.",
         explanation: "The folder now holds the note.",
         specification: readingPod,
         request: toPod("GET", scratch, [["accept", "text/turtle"]]),
@@ -581,8 +586,8 @@ export const aliceScript: readonly ScriptChapter[] = [
   {
     title: "When the Pod says no",
     narration:
-      "Alice has a folder, private/, whose access rules let in only one other app. Logging in doesn't change that: this app acts as Alice, but the Pod's rules can name apps too, so it refuses this one.",
-    watchFor: "The refused request is marked, with the status the Pod gave.",
+      "Alice has a private folder. Her Pod uses Access Control Policies: rules that can name the apps allowed in, as well as the people. This folder's rules let in only one other app. So although this app acts for Alice, the Pod turns it away.",
+    watchFor: "The refused request is marked in red on the map and in the timeline.",
     steps: [
       {
         step: "readContainer",
@@ -590,7 +595,7 @@ export const aliceScript: readonly ScriptChapter[] = [
         to: "pod",
         provenance: "seen",
         purpose: "Read the top folder of Alice's Pod again.",
-        explanation: "The top folder lists private/ among what it holds.",
+        explanation: "It lists private/ among what's in it.",
         specification: readingPod,
         request: toPod("GET", pod, [["accept", "text/turtle"]]),
         response: response(
@@ -605,9 +610,9 @@ export const aliceScript: readonly ScriptChapter[] = [
         from: "app",
         to: "pod",
         provenance: "seen",
-        purpose: "Read the private folder, as Alice, through this app.",
+        purpose: "Try to read the private folder, as Alice, through this app.",
         explanation:
-          "The token and proof are as good as before, but the folder's rules name the apps that may read it, and this isn't one. The Pod answers 403: it knows who is asking, and won't let this app in.",
+          "The pass and stamp are as good as before. But the folder's rules list the apps that may read it, and this app isn't one. The Pod answers 403 Forbidden: it knows who is asking, and won't let this app in.",
         specification: "https://solidproject.org/TR/protocol#authorization",
         request: toPod("GET", `${pod}private/`, [["accept", "text/turtle"]]),
         response: response(403, "Forbidden"),

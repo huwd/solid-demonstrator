@@ -185,22 +185,22 @@ describe("describeExchangeProblem", () => {
   const cases: [ExchangeProblem, RegExp, RegExp][] = [
     [
       { kind: "request-failed", diagnosis: { kind: "unreachable", summary: "No answer." } },
-      /token endpoint couldn't be reached/,
+      /couldn't be reached to finish logging in/,
       /^No answer\.$/,
     ],
     [
       { kind: "refused", status: 400, error: "invalid_grant", description: null },
-      /wouldn't exchange the code/,
+      /wouldn't accept the login code/,
       /expired or been used/,
     ],
     [
       { kind: "refused", status: 401, error: "invalid_client", description: "Unknown" },
-      /wouldn't exchange the code/,
+      /wouldn't accept the login code/,
       /It answered 401 with invalid_client: Unknown\./,
     ],
     [
       { kind: "refused", status: 400, error: "invalid_request", description: null },
-      /wouldn't exchange the code/,
+      /wouldn't accept the login code/,
       /invalid_request\.$/,
     ],
     [{ kind: "not-dpop", tokenType: "bearer" }, /isn't bound/, /type bearer/],

@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { type Choice, choose, initialChoice } from "../core/choice.ts";
 import { clientIdDocumentPath, clientMetadata } from "../core/client-id.ts";
 import { type DiscoveryResult, discover } from "../core/discovery.ts";
+import { glossary } from "../core/glossary.ts";
 import type { IssuerConfiguration } from "../core/issuer.ts";
 import { generateDpopKeyPair, type PendingLogin, prepareLogin } from "../core/login.ts";
 import { isLoginReturn, returnFromLogin } from "../core/login-return.ts";
@@ -96,6 +97,12 @@ export class DemonstratorApp extends LitElement {
     main > :not(.plumbing),
     .measure {
       max-width: 44rem;
+    }
+    .glossary dt {
+      font-weight: bold;
+    }
+    .glossary dd {
+      margin: 0 0 0.5rem;
     }
     label {
       display: block;
@@ -264,19 +271,32 @@ export class DemonstratorApp extends LitElement {
       <main>
         <h1>Solid Demonstrator</h1>
         <p>
-          A WebID is a URL that names a person. Fetching it gives a profile that says which
-          services may log them in, and where their data is kept.
+          Most apps keep your data on their own servers. With Solid, your data lives in a Pod: your
+          own online storage, in a place you choose. Apps ask to use parts of it, and you decide
+          which. Changing app doesn't mean leaving your data behind.
         </p>
-        <p>This demonstrator follows a WebID through each step of a Solid app, and shows every exchange as it happens.</p>
+        <p>
+          This demonstrator shows what a Solid app does behind the scenes: every message it sends
+          and receives, and why.
+        </p>
+        <details class="glossary">
+          <summary>What the words mean</summary>
+          <dl>
+            ${glossary.map(
+              (entry) => html`<dt>${entry.term}</dt>
+                <dd>${entry.meaning}</dd>`,
+            )}
+          </dl>
+        </details>
 
         ${
           state.kind === "idle"
             ? html`<section class="plumbing" aria-labelledby="introduction">
                 <h2 id="introduction">How Solid works</h2>
                 <p class="measure">
-                  Follow Alice, a fictional person, as an app finds her servers, logs her in, and
-                  reads and writes her Pod. Every exchange is an example, written from the Solid
-                  specifications.
+                  Follow Alice, who is made up, as an app finds her Pod, logs her in, reads and
+                  writes her data, and is turned away from a private folder. Every message is an
+                  example, written from the Solid specifications.
                 </p>
                 <solid-introduction></solid-introduction>
               </section>`
@@ -285,13 +305,13 @@ export class DemonstratorApp extends LitElement {
 
         <h2>Try it yourself</h2>
         <p>
-          Enter your WebID to follow the same journey with your own servers. You'll log in at your
+          Enter your WebID to follow the same journey with your own Pod. You'll log in with your
           own identity provider, and the app works only in a folder of its own in your Pod.
         </p>
         <p>
           No WebID yet? <a href="https://solidproject.org/get_a_pod">Get a Pod from a provider</a>
-          and it comes with one. You can also enter someone else's WebID: finding their servers
-          reads only what their profile makes public, but you can log in only as yourself.
+          and it comes with one. You can also enter someone else's WebID. The app only reads what
+          their profile makes public, and you can only log in as yourself.
         </p>
 
         <form @submit=${this.#submit} novalidate>
@@ -338,7 +358,7 @@ export class DemonstratorApp extends LitElement {
             : html`
               <h2>Every exchange so far</h2>
               <p>
-                Each request the app made, in order. Choose one to see what was sent and what came
+                Each message the app sent and received, in order. Choose one to see what was sent and what came
                 back. Secrets are hidden or shortened before anything is recorded.
               </p>
               <section class="plumbing" aria-label="Every exchange so far">

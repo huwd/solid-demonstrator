@@ -38,23 +38,23 @@ export function provenanceLabel(provenance: Provenance): ProvenanceLabel {
   switch (provenance) {
     case "seen":
       return {
-        label: "Seen",
+        label: "Seen by the app",
         meaning: "The browser made this request and received this response.",
       };
     case "reconstructed":
       return {
-        label: "Reconstructed",
+        label: "Pieced together",
         meaning:
           "Pieced together from what the browser could see before and after, because the exchange happened out of its sight.",
       };
     case "repeated":
       return {
-        label: "Repeated",
+        label: "Checked again here",
         meaning: "A check another server makes, repeated in the browser with the same public data.",
       };
     case "explained":
       return {
-        label: "Explained, not observed",
+        label: "Happens out of sight",
         meaning:
           "What the specification says happens here. Nothing was recorded, so this isn't a log.",
       };

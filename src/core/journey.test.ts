@@ -84,6 +84,10 @@ describe("describeFound", () => {
   it("says which parties have been found, in words", () => {
     assert.equal(describeFound(journeyOf([])), "Nothing found yet.");
     assert.equal(
+      describeFound(journeyOf(journeyEntries.slice(0, 1)), "Alice's"),
+      "Found so far: Alice's WebID profile.",
+    );
+    assert.equal(
       describeFound(journeyOf(journeyEntries.slice(0, 1))),
       "Found so far: your WebID profile.",
     );
@@ -124,10 +128,10 @@ describe("chaptersOf", () => {
         summary,
       ]),
       [
-        ["discovery", "Discovery", 2, "2 steps, all as expected."],
-        ["login", "Login", 6, "6 steps, all as expected."],
+        ["discovery", "Finding the servers", 2, "2 steps, all as expected."],
+        ["login", "Logging in", 6, "6 steps, all as expected."],
         ["pod", "Reading and writing", 3, "3 steps. 1 went other than expected."],
-        ["notifications", "Notifications", 3, "3 steps, all as expected."],
+        ["notifications", "Watching for changes", 3, "3 steps, all as expected."],
       ],
     );
   });

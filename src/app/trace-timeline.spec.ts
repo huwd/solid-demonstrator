@@ -47,7 +47,7 @@ test("lists every exchange in order, labelled with how it's known", async ({ pag
   await expect(entries.nth(1)).toContainText("This app → Identity provider");
   await expect(entries.nth(2)).toContainText("This app → Identity provider");
   for (const entry of await entries.all()) {
-    await expect(entry.getByText("Seen", { exact: true })).toBeVisible();
+    await expect(entry.getByText("Seen by the app", { exact: true })).toBeVisible();
   }
   await expect(entries.nth(0)).toContainText("As expected");
 });
@@ -106,7 +106,7 @@ test("groups the steps into chapters, and maps the parties found", async ({ page
   await discoverAlice(page);
 
   const timeline = page.locator("trace-timeline");
-  const discovery = timeline.getByRole("region", { name: "Discovery" });
+  const discovery = timeline.getByRole("region", { name: "Finding the servers" });
   await expect(discovery).toContainText("3 steps. 1 went other than expected.");
   const map = timeline.locator("journey-map");
   await expect(map).toContainText("Found so far: your WebID profile and 2 identity providers.");

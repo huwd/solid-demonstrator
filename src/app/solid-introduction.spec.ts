@@ -27,7 +27,9 @@ test("plays Alice's journey chapter by chapter, every step badged as an example"
   await expect(timeline.locator("journey-map .card.found")).toHaveCount(3);
 
   await introduction.getByRole("button", { name: "Next chapter" }).click();
-  await expect(introduction.getByRole("heading", { name: "Logging in" })).toBeVisible();
+  await expect(
+    introduction.locator(".narration").getByRole("heading", { name: "Logging in" }),
+  ).toBeVisible();
   await expect(timeline.locator("li")).toHaveCount(8);
   await timeline.locator('li[data-step="exchangeCode"] button').click();
   const detail = timeline.getByRole("complementary");

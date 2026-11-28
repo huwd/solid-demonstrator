@@ -82,3 +82,29 @@ describe("chapterOfEntry", () => {
     assert.equal(chapterOfEntry(aliceScript, entries.length + 1), aliceScript.length - 1);
   });
 });
+
+describe("aliceScript", () => {
+  /** Words that belong in the detail panel, explained there, and never in the story itself. */
+  const workings =
+    /\b(PKCE|DPoP|Turtle|WebSocket|ETag|OpenID|OIDC|JWT|headers?|issuer|nonce|scope|containers?|URL|PUT|GET|POST|40[0-9])\b/;
+
+  it("tells the story in plain words", () => {
+    for (const chapter of aliceScript) {
+      for (const text of [chapter.title, chapter.narration, chapter.watchFor]) {
+        assert.doesNotMatch(text, workings, text);
+      }
+      for (const step of chapter.steps) {
+        assert.doesNotMatch(step.purpose, workings, step.purpose);
+        assert.doesNotMatch(step.purpose, /\btokens?\b/, step.purpose);
+      }
+    }
+  });
+
+  it("keeps the story's sentences short", () => {
+    for (const chapter of aliceScript) {
+      for (const sentence of chapter.narration.split(/(?<=\.) /)) {
+        assert.ok(sentence.split(" ").length <= 25, sentence);
+      }
+    }
+  });
+});

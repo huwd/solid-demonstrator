@@ -34,6 +34,7 @@ export class TraceTimeline extends LitElement {
     trace: { attribute: false },
     example: { type: Boolean },
     showMap: { attribute: false },
+    whose: { attribute: false },
     entries: { state: true },
     selected: { state: true },
   };
@@ -43,6 +44,8 @@ export class TraceTimeline extends LitElement {
   /** Whether the entries are examples, written from the specifications, not a live session. */
   declare example: boolean;
   declare showMap: boolean;
+  /** Whose journey it is, for the map's sentence: "your", or "Alice's". */
+  declare whose: string;
   declare entries: readonly TraceEntry[];
   /** The step the person picked, or null to follow the newest. */
   declare selected: number | null;
@@ -208,6 +211,7 @@ export class TraceTimeline extends LitElement {
     this.trace = undefined;
     this.example = false;
     this.showMap = true;
+    this.whose = "your";
     this.entries = [];
     this.selected = null;
   }
@@ -268,6 +272,7 @@ export class TraceTimeline extends LitElement {
                 .journey=${journey}
                 .selected=${current.id}
                 .ghosts=${!this.example}
+                .whose=${this.whose}
                 @select=${(event: CustomEvent<number>) => this.#select(event.detail)}
               ></journey-map>
             </details>`
